@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meteor Store - Buying Offers</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 18px;
+            padding: 40px;
+        }
+        
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .store-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .store-header {
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .store-name {
+            color: #667eea;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .store-owner {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .offers-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .offers-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .offers-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .offers-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .price {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .quantity {
+            color: #007bff;
+        }
+        
+        .no-offers {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+        
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            margin-left: 10px;
+        }
+        
+        .copy-btn:hover {
+            background: #218838;
+        }
+        
+        .copy-btn.copied {
+            background: #6c757d;
+        }
+        
+        .last-update {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .debug-info {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        
+        .debug-info div {
+            margin: 5px 0;
+        }
+        
+        .debug-label {
+            font-weight: bold;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌠 Meteor Store - Buying Offers</h1>
+            <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+            <div class="last-update" id="lastUpdate"></div>
+            <div class="debug-info" id="debugInfo" style="display: none;"></div>
+        </header>
+        
+        <div id="loading" class="loading">Loading data...</div>
+        <div id="error" style="display: none;"></div>
+        <div id="stores"></div>
+    </div>
+
+    <script>
+        // ============================================
+        // DEBUG MODE - Set to false for production
+        // ============================================
+        const DEBUG_MODE = false;
+        // ============================================
+        
+        async function loadData() {
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const storesEl = document.getElementById('stores');
+            const lastUpdateEl = document.getElementById('lastUpdate');
+            const debugInfoEl = document.getElementById('debugInfo');
+            
+            loadingEl.style.display = 'block';
+            errorEl.style.display = 'none';
+            storesEl.innerHTML = '';
+            debugInfoEl.innerHTML = '';
+            
+            if (DEBUG_MODE) {
+                debugInfoEl.style.display = 'block';
+            } else {
+                debugInfoEl.style.display = 'none';
+            }
+            
+            try {
+                if (DEBUG_MODE) console.log('🔍 Starting data fetch...');
+                
+                const response = await fetch('http://gs1.play.eco:3041/api/v1/plugins/EcoPriceCalculator/stores');
+                
+                if (DEBUG_MODE) console.log('📡 Response Status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (DEBUG_MODE) console.log('📦 Raw data received:', data);
+                
+                const stores = data.Stores || [];
+                if (DEBUG_MODE) console.log(`🏪 Total stores: ${stores.length}`);
+                
+                // Debug: Log all store names
+                if (DEBUG_MODE) {
+                    stores.forEach((store, index) => {
+                        console.log(`Store ${index + 1}: "${store.Name}" (Owner: ${store.Owner}, Enabled: ${store.Enabled})`);
+                    });
+                }
+                
+                const meteorStores = stores.filter(store => 
+                    store.Name && store.Name.includes('Meteor Store')
+                );
+                
+                // Sort Meteor Stores in reverse alphabetical order
+                meteorStores.sort((a, b) => b.Name.localeCompare(a.Name));
+                
+                if (DEBUG_MODE) console.log(`🌠 Meteor Stores found: ${meteorStores.length}`);
+                
+                // Debug info display
+                let totalBuyingOffers = 0;
+                meteorStores.forEach(store => {
+                    const buyingOffers = (store.AllOffers || []).filter(offer => 
+                        offer.Buying === true && 
+                        offer.Price > 0 && 
+                        offer.Quantity > 0
+                    );
+                    totalBuyingOffers += buyingOffers.length;
+                });
+                
+                if (DEBUG_MODE) {
+                    debugInfoEl.innerHTML = `
+                        <div><span class="debug-label">🔍 DEBUG INFO:</span></div>
+                        <div>✓ Total stores: ${stores.length}</div>
+                        <div>✓ Meteor Stores found: ${meteorStores.length}</div>
+                        <div>✓ Active buying offers: ${totalBuyingOffers}</div>
+                        <div>✓ All store names: ${stores.map(s => s.Name).join(', ') || 'None found'}</div>
+                    `;
+                }
+                
+                if (meteorStores.length === 0) {
+                    storesEl.innerHTML = '<div class="store-card"><div class="no-offers">No Meteor Stores found</div></div>';
+                } else {
+                    meteorStores.forEach(store => {
+                        const allOffers = store.AllOffers || [];
+                        const buyingOffers = allOffers.filter(offer => 
+                            offer.Buying === true && 
+                            offer.Price > 0 && 
+                            offer.Quantity > 0
+                        );
+                        
+                        if (DEBUG_MODE) {
+                            console.log(`📋 Store "${store.Name}": ${allOffers.length} total offers, ${buyingOffers.length} filtered buying offers`);
+                        }
+                        
+                        const storeCard = document.createElement('div');
+                        storeCard.className = 'store-card';
+                        storeCard.dataset.storeName = store.Name;
+                        storeCard.dataset.storeOffers = JSON.stringify(buyingOffers);
+                        
+                        let offersHtml = '';
+                        if (buyingOffers.length === 0) {
+                            offersHtml = '<div class="no-offers">No active buying offers</div>';
+                        } else {
+                            offersHtml = `
+                                <table class="offers-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Price</th>
+                                            <th>Quantity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${buyingOffers.map(offer => `
+                                            <tr>
+                                                <td>${offer.ItemName || 'N/A'}</td>
+                                                <td class="price">${offer.Price.toFixed(2)} ¢</td>
+                                                <td class="quantity">${offer.Quantity}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            `;
+                        }
+                        
+                        storeCard.innerHTML = `
+                            <div class="store-header">
+                                <div class="store-name">
+                                    ${store.Name}
+                                    <button class="copy-btn" onclick="copyToClipboard('${store.Name.replace(/'/g, "\\'")}', this)">📋 Copy for Discord</button>
+                                </div>
+                                <div class="store-owner">Owner: ${store.Owner || 'Unknown'} ${store.Enabled ? '✅ Active' : '❌ Inactive'}</div>
+                            </div>
+                            ${offersHtml}
+                        `;
+                        
+                        storesEl.appendChild(storeCard);
+                    });
+                }
+                
+                lastUpdateEl.textContent = `Last updated: ${new Date().toLocaleString('en-US')}`;
+                if (DEBUG_MODE) console.log('✅ Data loaded successfully');
+                
+            } catch (error) {
+                errorEl.style.display = 'block';
+                errorEl.className = 'error';
+                errorEl.textContent = `Error loading data: ${error.message}`;
+                console.error('❌ Error:', error);
+                
+                if (DEBUG_MODE) {
+                    debugInfoEl.style.display = 'block';
+                    debugInfoEl.innerHTML = `
+                        <div><span class="debug-label">❌ ERROR:</span></div>
+                        <div>${error.message}</div>
+                        <div>Check browser console (F12) for details</div>
+                    `;
+                }
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        }
+        
+        // Load data on page load
+        loadData();
+        
+        // Copy store data to clipboard for Discord
+        function copyToClipboard(storeName, buttonEl) {
+            const storeCard = buttonEl.closest('.store-card');
+            const offers = JSON.parse(storeCard.dataset.storeOffers);
+            
+            if (offers.length === 0) {
+                alert('No offers to copy!');
+                return;
+            }
+            
+            // Build Discord-formatted message with code block
+            let discordMessage = `**${storeName}** - Buying Offers:\n\`\`\`\n`;
+            discordMessage += `${'Item'.padEnd(30)} | ${'Price'.padEnd(10)} | Quantity\n`;
+            discordMessage += `${'-'.repeat(30)} | ${'-'.repeat(10)} | ${'-'.repeat(8)}\n`;
+            
+            offers.forEach(offer => {
+                const itemName = (offer.ItemName || 'N/A').padEnd(30);
+                const price = (offer.Price.toFixed(2) + ' ¢').padEnd(10);
+                const quantity = offer.Quantity.toString();
+                discordMessage += `${itemName} | ${price} | ${quantity}\n`;
+            });
+            
+            discordMessage += `\`\`\``;
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(discordMessage).then(() => {
+                const originalText = buttonEl.textContent;
+                buttonEl.textContent = '✅ Copied!';
+                buttonEl.classList.add('copied');
+                
+                setTimeout(() => {
+                    buttonEl.textContent = originalText;
+                    buttonEl.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard. Please check browser permissions.');
+            });
+        }
+        
+        // Optional: Auto-refresh every 30 seconds
+        // setInterval(loadData, 30000);
+    </script>
+</body>
+</html>

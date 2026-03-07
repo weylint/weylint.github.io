@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meteor Store - Buying Offers</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -78,6 +79,20 @@
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .chart-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .chart-container canvas {
+            max-width: 500px;
+            max-height: 500px;
+            margin: 0 auto;
         }
         
         .store-header {
@@ -412,12 +427,40 @@
                             return (a.ItemName || '').localeCompare(b.ItemName || '');
                         });
                         
+                        // Calculate skill volumes for pie chart (skill without level)
+                        const skillVolumes = {};
+                        buyingOffers.forEach(offer => {
+                            const fullSkill = itemSkillMap[offer.ItemName] || 'N/A';
+                            // Remove level number from skill (e.g., "Advanced Masonry 6" -> "Advanced Masonry")
+                            const skillName = fullSkill.replace(/\s+\d+$/, '');
+                            const volume = offer.Price * offer.Quantity;
+                            
+                            if (!skillVolumes[skillName]) {
+                                skillVolumes[skillName] = 0;
+                            }
+                            skillVolumes[skillName] += volume;
+                        });
+                        
+                        if (DEBUG_MODE) {
+                            console.log(`📊 Skill volumes for "${store.Name}":`, skillVolumes);
+                        }
+                        
                         let offersHtml = '';
                         if (buyingOffers.length === 0) {
                             offersHtml = '<div class="no-offers">No active buying offers</div>';
                         } else {
                             const tableId = `table-${store.Name.replace(/\s+/g, '-')}`;
-                            offersHtml = `
+                            const chartId = `chart-${store.Name.replace(/\s+/g, '-')}`;
+                            
+                            // Create pie chart
+                            const chartHtml = `
+                                <div class="chart-container">
+                                    <h3>Volume by Skill</h3>
+                                    <canvas id="${chartId}"></canvas>
+                                </div>
+                            `;
+                            
+                            offersHtml = chartHtml + `
                                 <table class="offers-table" id="${tableId}">
                                     <thead>
                                         <tr>
@@ -457,6 +500,11 @@
                         `;
                         
                         storesEl.appendChild(storeCard);
+                        
+                        // Create pie chart after DOM is updated
+                        if (buyingOffers.length > 0) {
+                            createPieChart(chartId, skillVolumes);
+                        }
                     });
                 }
                 
@@ -484,6 +532,72 @@
         
         // Load data on page load
         loadData();
+        
+        // Create pie chart using Chart.js
+        function createPieChart(canvasId, skillVolumes) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            
+            const skills = Object.keys(skillVolumes).sort();
+            const volumes = skills.map(skill => skillVolumes[skill]);
+            
+            // Generate colors for each skill
+            const colors = generateColors(skills.length);
+            
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: skills,
+                    datasets: [{
+                        data: volumes,
+                        backgroundColor: colors,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 10,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value.toFixed(2)} € (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Generate distinct colors for pie chart
+        function generateColors(count) {
+            const colors = [];
+            const baseHues = [0, 30, 60, 120, 180, 210, 240, 270, 300, 330];
+            
+            for (let i = 0; i < count; i++) {
+                const hue = baseHues[i % baseHues.length];
+                const saturation = 70 - (Math.floor(i / baseHues.length) * 15);
+                const lightness = 60 + (Math.floor(i / baseHues.length) * 5);
+                colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+            }
+            
+            return colors;
+        }
         
         // Copy store data to clipboard for Discord
         function copyToClipboard(storeName, buttonEl) {

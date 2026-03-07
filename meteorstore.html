@@ -281,18 +281,62 @@
             try {
                 if (DEBUG_MODE) console.log('🔍 Starting data fetch...');
                 
-                const response = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/stores');
+                // Fetch stores data
+                const storesResponse = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/stores');
                 
-                if (DEBUG_MODE) console.log('📡 Response Status:', response.status);
+                if (DEBUG_MODE) console.log('📡 Stores Response Status:', storesResponse.status);
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP Error: ${response.status}`);
+                if (!storesResponse.ok) {
+                    throw new Error(`HTTP Error (Stores): ${storesResponse.status}`);
                 }
                 
-                const data = await response.json();
-                if (DEBUG_MODE) console.log('📦 Raw data received:', data);
+                const storesData = await storesResponse.json();
+                if (DEBUG_MODE) console.log('📦 Stores data received:', storesData);
                 
-                const stores = data.Stores || [];
+                // Fetch recipes data
+                const recipesResponse = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes');
+                
+                if (DEBUG_MODE) console.log('📡 Recipes Response Status:', recipesResponse.status);
+                
+                if (!recipesResponse.ok) {
+                    throw new Error(`HTTP Error (Recipes): ${recipesResponse.status}`);
+                }
+                
+                const recipesData = await recipesResponse.json();
+                if (DEBUG_MODE) console.log('📦 Recipes data received:', recipesData);
+                
+                // Create a map of item name to skill name + level
+                const itemSkillMap = {};
+                if (recipesData.Recipes) {
+                    recipesData.Recipes.forEach(recipe => {
+                        const variants = recipe.Variants || [];
+                        const skillNeeds = recipe.SkillNeeds || [];
+                        
+                        // Check all variants for products
+                        variants.forEach(variant => {
+                            const products = variant.Products || [];
+                            products.forEach(product => {
+                                const itemName = product.Name;
+                                
+                                // Only map if we haven't seen this item yet (take first recipe)
+                                if (itemName && !itemSkillMap[itemName]) {
+                                    // Extract skill name and level from SkillNeeds[0]
+                                    if (skillNeeds.length > 0 && skillNeeds[0].Skill) {
+                                        const skillName = skillNeeds[0].Skill;
+                                        const skillLevel = skillNeeds[0].Level || '';
+                                        itemSkillMap[itemName] = skillLevel ? `${skillName} ${skillLevel}` : skillName;
+                                    } else {
+                                        itemSkillMap[itemName] = 'N/A';
+                                    }
+                                }
+                            });
+                        });
+                    });
+                }
+                
+                if (DEBUG_MODE) console.log('🔧 Item-Skill map created:', itemSkillMap);
+                
+                const stores = storesData.Stores || [];
                 if (DEBUG_MODE) console.log(`🏪 Total stores: ${stores.length}`);
                 
                 // Debug: Log all store names
@@ -350,7 +394,23 @@
                         const storeCard = document.createElement('div');
                         storeCard.className = 'store-card';
                         storeCard.dataset.storeName = store.Name;
-                        storeCard.dataset.storeOffers = JSON.stringify(buyingOffers);
+                        storeCard.dataset.storeOffers = JSON.stringify(buyingOffers.map(offer => ({
+                            ...offer,
+                            Skill: itemSkillMap[offer.ItemName] || 'N/A'
+                        })));
+                        
+                        // Sort by Skill first, then by Item Name
+                        buyingOffers.sort((a, b) => {
+                            const skillA = itemSkillMap[a.ItemName] || 'N/A';
+                            const skillB = itemSkillMap[b.ItemName] || 'N/A';
+                            
+                            // First compare by skill
+                            const skillComparison = skillA.localeCompare(skillB);
+                            if (skillComparison !== 0) return skillComparison;
+                            
+                            // If skills are the same, compare by item name
+                            return (a.ItemName || '').localeCompare(b.ItemName || '');
+                        });
                         
                         let offersHtml = '';
                         if (buyingOffers.length === 0) {
@@ -362,20 +422,24 @@
                                     <thead>
                                         <tr>
                                             <th class="sortable" data-column="item" onclick="sortTable('${tableId}', 'item', this)">Item</th>
+                                            <th class="sortable" data-column="skill" onclick="sortTable('${tableId}', 'skill', this)">Skill</th>
                                             <th class="sortable align-right" data-column="price" onclick="sortTable('${tableId}', 'price', this)">Price</th>
                                             <th class="sortable align-right" data-column="quantity" onclick="sortTable('${tableId}', 'quantity', this)">Quantity</th>
                                             <th class="sortable align-right" data-column="volume" onclick="sortTable('${tableId}', 'volume', this)">Volume</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${buyingOffers.map(offer => `
+                                        ${buyingOffers.map(offer => {
+                                            const skillName = itemSkillMap[offer.ItemName] || 'N/A';
+                                            return `
                                             <tr>
                                                 <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
+                                                <td data-value="${skillName}">${skillName}</td>
                                                 <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
                                                 <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
                                                 <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
                                             </tr>
-                                        `).join('')}
+                                        `}).join('')}
                                     </tbody>
                                 </table>
                             `;
@@ -433,15 +497,16 @@
             
             // Build Discord-formatted message with code block
             let discordMessage = `**${storeName}** - Buying Offers:\n\`\`\`\n`;
-            discordMessage += `${'Item'.padEnd(30)} | ${'Price'.padEnd(10)} | ${'Qty'.padEnd(6)} | Volume\n`;
-            discordMessage += `${'-'.repeat(30)} | ${'-'.repeat(10)} | ${'-'.repeat(6)} | ${'-'.repeat(10)}\n`;
+            discordMessage += `${'Item'.padEnd(30)} | ${'Skill'.padEnd(20)} | ${'Price'.padEnd(10)} | ${'Qty'.padEnd(6)} | Volume\n`;
+            discordMessage += `${'-'.repeat(30)} | ${'-'.repeat(20)} | ${'-'.repeat(10)} | ${'-'.repeat(6)} | ${'-'.repeat(10)}\n`;
             
             offers.forEach(offer => {
                 const itemName = (offer.ItemName || 'N/A').padEnd(30);
+                const skillName = (offer.Skill || 'N/A').padEnd(20);
                 const price = (offer.Price.toFixed(2) + ' €').padEnd(10);
                 const quantity = offer.Quantity.toString().padEnd(6);
                 const volume = (offer.Price * offer.Quantity).toFixed(2) + ' €';
-                discordMessage += `${itemName} | ${price} | ${quantity} | ${volume}\n`;
+                discordMessage += `${itemName} | ${skillName} | ${price} | ${quantity} | ${volume}\n`;
             });
             
             discordMessage += `\`\`\``;
@@ -516,9 +581,10 @@
         function getColumnIndex(column) {
             const columnMap = {
                 'item': 1,
-                'price': 2,
-                'quantity': 3,
-                'volume': 4
+                'skill': 2,
+                'price': 3,
+                'quantity': 4,
+                'volume': 5
             };
             return columnMap[column];
         }

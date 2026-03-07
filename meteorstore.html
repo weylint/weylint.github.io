@@ -31,6 +31,27 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .debug-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .debug-toggle input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+        
         h1 {
             color: #667eea;
             margin-bottom: 10px;
@@ -90,6 +111,33 @@
             font-weight: 600;
             color: #333;
             border-bottom: 2px solid #dee2e6;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        
+        .offers-table th:hover {
+            background: #e9ecef;
+        }
+        
+        .offers-table th.sortable::after {
+            content: ' ⇅';
+            opacity: 0.3;
+        }
+        
+        .offers-table th.sorted-asc::after {
+            content: ' ▲';
+            opacity: 1;
+        }
+        
+        .offers-table th.sorted-desc::after {
+            content: ' ▼';
+            opacity: 1;
+        }
+        
+        .offers-table th.align-right,
+        .offers-table td.align-right {
+            text-align: right;
         }
         
         .offers-table td {
@@ -182,7 +230,13 @@
     <div class="container">
         <header>
             <h1>🌠 Meteor Store - Buying Offers</h1>
-            <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+            <div class="header-controls">
+                <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+                <label class="debug-toggle">
+                    <input type="checkbox" id="debugModeToggle" onchange="toggleDebugMode()">
+                    Debug Mode
+                </label>
+            </div>
             <div class="last-update" id="lastUpdate"></div>
             <div class="debug-info" id="debugInfo" style="display: none;"></div>
         </header>
@@ -194,10 +248,23 @@
 
     <script>
         // ============================================
-        // DEBUG MODE - Set to false for production
+        // DEBUG MODE - Controlled by checkbox
         // ============================================
-        const DEBUG_MODE = false;
+        let DEBUG_MODE = false;
         // ============================================
+        
+        function toggleDebugMode() {
+            DEBUG_MODE = document.getElementById('debugModeToggle').checked;
+            const debugInfoEl = document.getElementById('debugInfo');
+            
+            if (DEBUG_MODE) {
+                debugInfoEl.style.display = 'block';
+                console.log('🔍 Debug mode enabled');
+            } else {
+                debugInfoEl.style.display = 'none';
+                console.log('🔍 Debug mode disabled');
+            }
+        }
         
         async function loadData() {
             const loadingEl = document.getElementById('loading');
@@ -211,16 +278,10 @@
             storesEl.innerHTML = '';
             debugInfoEl.innerHTML = '';
             
-            if (DEBUG_MODE) {
-                debugInfoEl.style.display = 'block';
-            } else {
-                debugInfoEl.style.display = 'none';
-            }
-            
             try {
                 if (DEBUG_MODE) console.log('🔍 Starting data fetch...');
                 
-                const response = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/stores');
+                const response = await fetch('http://gs1.play.eco:3041/api/v1/plugins/EcoPriceCalculator/stores');
                 
                 if (DEBUG_MODE) console.log('📡 Response Status:', response.status);
                 
@@ -295,21 +356,24 @@
                         if (buyingOffers.length === 0) {
                             offersHtml = '<div class="no-offers">No active buying offers</div>';
                         } else {
+                            const tableId = `table-${store.Name.replace(/\s+/g, '-')}`;
                             offersHtml = `
-                                <table class="offers-table">
+                                <table class="offers-table" id="${tableId}">
                                     <thead>
                                         <tr>
-                                            <th>Item</th>
-                                            <th>Price</th>
-                                            <th>Quantity</th>
+                                            <th class="sortable" data-column="item" onclick="sortTable('${tableId}', 'item', this)">Item</th>
+                                            <th class="sortable align-right" data-column="price" onclick="sortTable('${tableId}', 'price', this)">Price</th>
+                                            <th class="sortable align-right" data-column="quantity" onclick="sortTable('${tableId}', 'quantity', this)">Quantity</th>
+                                            <th class="sortable align-right" data-column="volume" onclick="sortTable('${tableId}', 'volume', this)">Volume</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${buyingOffers.map(offer => `
                                             <tr>
-                                                <td>${offer.ItemName || 'N/A'}</td>
-                                                <td class="price">${offer.Price.toFixed(2)} ¢</td>
-                                                <td class="quantity">${offer.Quantity}</td>
+                                                <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
+                                                <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
+                                                <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
+                                                <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
                                             </tr>
                                         `).join('')}
                                     </tbody>
@@ -369,14 +433,15 @@
             
             // Build Discord-formatted message with code block
             let discordMessage = `**${storeName}** - Buying Offers:\n\`\`\`\n`;
-            discordMessage += `${'Item'.padEnd(30)} | ${'Price'.padEnd(10)} | Quantity\n`;
-            discordMessage += `${'-'.repeat(30)} | ${'-'.repeat(10)} | ${'-'.repeat(8)}\n`;
+            discordMessage += `${'Item'.padEnd(30)} | ${'Price'.padEnd(10)} | ${'Qty'.padEnd(6)} | Volume\n`;
+            discordMessage += `${'-'.repeat(30)} | ${'-'.repeat(10)} | ${'-'.repeat(6)} | ${'-'.repeat(10)}\n`;
             
             offers.forEach(offer => {
                 const itemName = (offer.ItemName || 'N/A').padEnd(30);
-                const price = (offer.Price.toFixed(2) + ' ¢').padEnd(10);
-                const quantity = offer.Quantity.toString();
-                discordMessage += `${itemName} | ${price} | ${quantity}\n`;
+                const price = (offer.Price.toFixed(2) + ' €').padEnd(10);
+                const quantity = offer.Quantity.toString().padEnd(6);
+                const volume = (offer.Price * offer.Quantity).toFixed(2) + ' €';
+                discordMessage += `${itemName} | ${price} | ${quantity} | ${volume}\n`;
             });
             
             discordMessage += `\`\`\``;
@@ -395,6 +460,67 @@
                 console.error('Failed to copy:', err);
                 alert('Failed to copy to clipboard. Please check browser permissions.');
             });
+        }
+        
+        // Sort table by column
+        const tableSortStates = {};
+        
+        function sortTable(tableId, column, headerEl) {
+            const table = document.getElementById(tableId);
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Initialize sort state for this table
+            if (!tableSortStates[tableId]) {
+                tableSortStates[tableId] = {};
+            }
+            
+            // Determine sort direction
+            const currentDirection = tableSortStates[tableId][column] || 'none';
+            const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+            tableSortStates[tableId][column] = newDirection;
+            
+            // Remove all sort indicators
+            table.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+            });
+            
+            // Add sort indicator to current header
+            headerEl.classList.add(newDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                const aCell = a.querySelector(`td[data-value]:nth-child(${getColumnIndex(column)})`);
+                const bCell = b.querySelector(`td[data-value]:nth-child(${getColumnIndex(column)})`);
+                
+                const aValue = aCell.dataset.value;
+                const bValue = bCell.dataset.value;
+                
+                let comparison = 0;
+                
+                // Numeric comparison for price, quantity, volume
+                if (column === 'price' || column === 'quantity' || column === 'volume') {
+                    comparison = parseFloat(aValue) - parseFloat(bValue);
+                } else {
+                    // String comparison for item
+                    comparison = aValue.localeCompare(bValue);
+                }
+                
+                return newDirection === 'asc' ? comparison : -comparison;
+            });
+            
+            // Reorder rows in DOM
+            rows.forEach(row => tbody.appendChild(row));
+        }
+        
+        function getColumnIndex(column) {
+            const columnMap = {
+                'item': 1,
+                'price': 2,
+                'quantity': 3,
+                'volume': 4
+            };
+            return columnMap[column];
         }
         
         // Optional: Auto-refresh every 30 seconds

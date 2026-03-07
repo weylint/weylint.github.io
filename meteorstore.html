@@ -486,13 +486,17 @@
                                     </tbody>
                                 </table>
                             `;
+                            
+                            // Store chartId and skillVolumes for later chart creation
+                            storeCard.dataset.chartId = chartId;
+                            storeCard.dataset.skillVolumes = JSON.stringify(skillVolumes);
                         }
                         
                         storeCard.innerHTML = `
                             <div class="store-header">
                                 <div class="store-name">
                                     ${store.Name}
-                                    <button class="copy-btn" onclick="copyToClipboard('${store.Name.replace(/'/g, "\\'")}', this)">📋 Copy for Discord</button>
+                                    <button class="copy-btn" onclick="copyToClipboard(event, this)">📋 Copy for Discord</button>
                                 </div>
                                 <div class="store-owner">Owner: ${store.Owner || 'Unknown'} ${store.Enabled ? '✅ Active' : '❌ Inactive'}</div>
                             </div>
@@ -503,6 +507,8 @@
                         
                         // Create pie chart after DOM is updated
                         if (buyingOffers.length > 0) {
+                            const chartId = storeCard.dataset.chartId;
+                            const skillVolumes = JSON.parse(storeCard.dataset.skillVolumes);
                             createPieChart(chartId, skillVolumes);
                         }
                     });
@@ -538,16 +544,20 @@
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
             
-            const skills = Object.keys(skillVolumes).sort();
-            const volumes = skills.map(skill => skillVolumes[skill]);
+            // Sort skills by volume (descending)
+            const sortedSkills = Object.entries(skillVolumes)
+                .sort((a, b) => b[1] - a[1])
+                .map(entry => entry[0]);
+            
+            const volumes = sortedSkills.map(skill => skillVolumes[skill]);
             
             // Generate colors for each skill
-            const colors = generateColors(skills.length);
+            const colors = generateColors(sortedSkills.length);
             
             new Chart(ctx, {
                 type: 'pie',
                 data: {
-                    labels: skills,
+                    labels: sortedSkills,
                     datasets: [{
                         data: volumes,
                         backgroundColor: colors,
@@ -600,8 +610,10 @@
         }
         
         // Copy store data to clipboard for Discord
-        function copyToClipboard(storeName, buttonEl) {
+        function copyToClipboard(event, buttonEl) {
+            event.preventDefault();
             const storeCard = buttonEl.closest('.store-card');
+            const storeName = storeCard.dataset.storeName;
             const offers = JSON.parse(storeCard.dataset.storeOffers);
             
             if (offers.length === 0) {

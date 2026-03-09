@@ -420,6 +420,116 @@
                 
                 if (DEBUG_MODE) console.log('🔧 Item-Skill map created:', itemSkillMap);
                 
+                // Helper function to create table row
+                const createTableRow = (offer) => {
+                    const skillName = itemSkillMap[offer.ItemName] || 'N/A';
+                    const itemData = marketAvailability[offer.ItemName];
+                    
+                    let inRangeQty = 0;
+                    let outOfRangeQty = 0;
+                    
+                    if (itemData) {
+                        const buyPrice = offer.Price;
+                        const maxPrice = buyPrice * 1.2;
+                        
+                        itemData.byPrice.forEach(sellOffer => {
+                            if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                inRangeQty += sellOffer.quantity;
+                            } else if (sellOffer.price > maxPrice) {
+                                outOfRangeQty += sellOffer.quantity;
+                            }
+                        });
+                    }
+                    
+                    const availableDisplay = inRangeQty > 0 ? `${inRangeQty}` : '-';
+                    const expensiveDisplay = outOfRangeQty > 0 ? outOfRangeQty : '-';
+                    
+                    return `
+                        <tr>
+                            <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
+                            <td data-value="${offer.StoreName}">${offer.StoreName}</td>
+                            <td data-value="${skillName}">${skillName}</td>
+                            <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
+                            <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
+                            <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
+                            <td class="align-right" data-value="${outOfRangeQty}">${expensiveDisplay}</td>
+                            <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
+                        </tr>
+                    `;
+                };
+                
+                const createPaperTableRow = (offer) => {
+                    const itemData = marketAvailability[offer.ItemName];
+                    
+                    let inRangeQty = 0;
+                    let outOfRangeQty = 0;
+                    
+                    if (itemData) {
+                        const buyPrice = offer.Price;
+                        const maxPrice = buyPrice * 1.2;
+                        
+                        itemData.byPrice.forEach(sellOffer => {
+                            if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                inRangeQty += sellOffer.quantity;
+                            } else if (sellOffer.price > maxPrice) {
+                                outOfRangeQty += sellOffer.quantity;
+                            }
+                        });
+                    }
+                    
+                    const availableDisplay = inRangeQty > 0 ? `${inRangeQty}` : '-';
+                    const expensiveDisplay = outOfRangeQty > 0 ? outOfRangeQty : '-';
+                    
+                    return `
+                        <tr>
+                            <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
+                            <td data-value="${offer.StoreName}">${offer.StoreName}</td>
+                            <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
+                            <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
+                            <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
+                            <td class="align-right" data-value="${outOfRangeQty}">${expensiveDisplay}</td>
+                            <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
+                        </tr>
+                    `;
+                };
+                
+                const createCompletedRow = (offer) => {
+                    const skillName = itemSkillMap[offer.ItemName] || 'N/A';
+                    const itemData = marketAvailability[offer.ItemName];
+                    
+                    let inRangeQty = 0;
+                    let outOfRangeQty = 0;
+                    
+                    if (itemData) {
+                        const buyPrice = offer.Price;
+                        const maxPrice = buyPrice * 1.2;
+                        
+                        itemData.byPrice.forEach(sellOffer => {
+                            if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                inRangeQty += sellOffer.quantity;
+                            } else if (sellOffer.price > maxPrice) {
+                                outOfRangeQty += sellOffer.quantity;
+                            }
+                        });
+                    }
+                    
+                    const availableDisplay = inRangeQty > 0 ? `${inRangeQty}` : '-';
+                    const expensiveDisplay = outOfRangeQty > 0 ? outOfRangeQty : '-';
+                    
+                    return `
+                        <tr class="row-available">
+                            <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
+                            <td data-value="${offer.StoreName}">${offer.StoreName}</td>
+                            <td data-value="${skillName}">${skillName}</td>
+                            <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
+                            <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
+                            <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
+                            <td class="align-right" data-value="${outOfRangeQty}">${expensiveDisplay}</td>
+                            <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
+                        </tr>
+                    `;
+                };
+
                 const stores = storesData.Stores || [];
                 if (DEBUG_MODE) console.log(`🏪 Total stores: ${stores.length}`);
                 
@@ -463,6 +573,12 @@
                 if (meteorStores.length === 0) {
                     storesEl.innerHTML = '<div class="store-card"><div class="no-offers">No Meteor Stores found</div></div>';
                 } else {
+                    // Consolidate all offers from all Meteor Stores
+                    const allRegularOffers = [];
+                    const allModernPapers = [];
+                    const allAdvancedPapers = [];
+                    const allCompletedItems = [];
+                    
                     meteorStores.forEach(store => {
                         const allOffers = store.AllOffers || [];
                         const buyingOffers = allOffers.filter(offer => 
@@ -471,80 +587,11 @@
                             offer.Quantity > 0
                         );
                         
-                        // Separate research papers from regular items
-                        const researchPapers = buyingOffers.filter(offer => 
-                            offer.ItemName && offer.ItemName.endsWith('Research Paper Modern')
-                        );
-                        
-                        const regularOffers = buyingOffers.filter(offer => 
-                            !offer.ItemName || !offer.ItemName.endsWith('Research Paper Modern')
-                        );
-                        
-                        if (DEBUG_MODE) {
-                            console.log(`📋 Store "${store.Name}": ${allOffers.length} total offers, ${regularOffers.length} regular offers, ${researchPapers.length} research papers`);
-                        }
-                        
-                        const storeCard = document.createElement('div');
-                        storeCard.className = 'store-card';
-                        storeCard.dataset.storeName = store.Name;
-                        storeCard.dataset.storeOffers = JSON.stringify(buyingOffers.map(offer => ({
-                            ...offer,
-                            Skill: itemSkillMap[offer.ItemName] || 'N/A'
-                        })));
-                        
-                        // Sort regular offers by Skill first, then by Item Name
-                        regularOffers.sort((a, b) => {
-                            const skillA = itemSkillMap[a.ItemName] || 'N/A';
-                            const skillB = itemSkillMap[b.ItemName] || 'N/A';
+                        buyingOffers.forEach(offer => {
+                            // Add store name to offer
+                            const offerWithStore = { ...offer, StoreName: store.Name };
                             
-                            // First compare by skill
-                            const skillComparison = skillA.localeCompare(skillB);
-                            if (skillComparison !== 0) return skillComparison;
-                            
-                            // If skills are the same, compare by item name
-                            return (a.ItemName || '').localeCompare(b.ItemName || '');
-                        });
-                        
-                        // Sort research papers by name
-                        researchPapers.sort((a, b) => 
-                            (a.ItemName || '').localeCompare(b.ItemName || '')
-                        );
-                        
-                        // Calculate skill volumes for regular items pie chart (exclude items with market availability)
-                        const skillVolumes = {};
-                        regularOffers.forEach(offer => {
-                            const itemData = marketAvailability[offer.ItemName];
-                            let inRangeQty = 0;
-                            
-                            if (itemData) {
-                                const buyPrice = offer.Price;
-                                const maxPrice = buyPrice * 1.2; // 20% higher
-                                
-                                itemData.byPrice.forEach(sellOffer => {
-                                    // Consider available if price > 0 and <= maxPrice (cheaper or up to 20% more expensive)
-                                    if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
-                                        inRangeQty += sellOffer.quantity;
-                                    }
-                                });
-                            }
-                            
-                            // Only include in chart if NOT enough available on market within price range
-                            if (inRangeQty < offer.Quantity) {
-                                const fullSkill = itemSkillMap[offer.ItemName] || 'N/A';
-                                // Remove level number from skill
-                                const skillName = fullSkill.replace(/\s+\d+$/, '');
-                                const volume = offer.Price * offer.Quantity;
-                                
-                                if (!skillVolumes[skillName]) {
-                                    skillVolumes[skillName] = 0;
-                                }
-                                skillVolumes[skillName] += volume;
-                            }
-                        });
-                        
-                        // Add research papers to skill volumes as "Modern Paper" category
-                        let modernPaperVolume = 0;
-                        researchPapers.forEach(offer => {
+                            // Check availability
                             const itemData = marketAvailability[offer.ItemName];
                             let inRangeQty = 0;
                             
@@ -559,245 +606,270 @@
                                 });
                             }
                             
-                            // Only include in chart if NOT enough available on market within price range
-                            if (inRangeQty < offer.Quantity) {
-                                const volume = offer.Price * offer.Quantity;
-                                modernPaperVolume += volume;
+                            const isAvailable = inRangeQty >= offer.Quantity;
+                            
+                            // Categorize the offer
+                            if (isAvailable) {
+                                allCompletedItems.push(offerWithStore);
+                            } else if (offer.ItemName && offer.ItemName.endsWith('Research Paper Modern')) {
+                                allModernPapers.push(offerWithStore);
+                            } else if (offer.ItemName && offer.ItemName.endsWith('Research Paper Advanced')) {
+                                allAdvancedPapers.push(offerWithStore);
+                            } else {
+                                allRegularOffers.push(offerWithStore);
                             }
                         });
-                        
-                        if (modernPaperVolume > 0) {
-                            skillVolumes['Modern Paper'] = modernPaperVolume;
-                        }
-                        
-                        // Calculate volumes for research papers pie chart (exclude items with market availability)
-                        const paperVolumes = {};
-                        researchPapers.forEach(offer => {
-                            const itemData = marketAvailability[offer.ItemName];
-                            let inRangeQty = 0;
-                            
-                            if (itemData) {
-                                const buyPrice = offer.Price;
-                                const maxPrice = buyPrice * 1.2;
-                                
-                                itemData.byPrice.forEach(sellOffer => {
-                                    if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
-                                        inRangeQty += sellOffer.quantity;
-                                    }
-                                });
-                            }
-                            
-                            // Only include in chart if NOT enough available on market within price range
-                            if (inRangeQty < offer.Quantity) {
-                                const paperName = offer.ItemName;
-                                const volume = offer.Price * offer.Quantity;
-                                paperVolumes[paperName] = volume;
-                            }
-                        });
-                        
-                        if (DEBUG_MODE) {
-                            console.log(`📊 Regular skill volumes for "${store.Name}":`, skillVolumes);
-                            console.log(`📊 Paper volumes for "${store.Name}":`, paperVolumes);
-                        }
-                        
-                        let offersHtml = '';
-                        if (buyingOffers.length === 0) {
-                            offersHtml = '<div class="no-offers">No active buying offers</div>';
-                        } else {
-                            const tableId = `table-${store.Name.replace(/\s+/g, '-')}`;
-                            const chartId = `chart-${store.Name.replace(/\s+/g, '-')}`;
-                            const papersTableId = `papers-table-${store.Name.replace(/\s+/g, '-')}`;
-                            const papersChartId = `papers-chart-${store.Name.replace(/\s+/g, '-')}`;
-                            
-                            // Create charts section
-                            let chartsHtml = '<div class="chart-container"><div class="charts-wrapper">';
-                            
-                            if (regularOffers.length > 0) {
-                                chartsHtml += `
-                                    <div class="chart-box">
-                                        <h3>Regular Items by Skill</h3>
-                                        <canvas id="${chartId}"></canvas>
-                                    </div>
-                                `;
-                            }
-                            
-                            if (researchPapers.length > 0) {
-                                chartsHtml += `
-                                    <div class="chart-box">
-                                        <h3>Research Papers</h3>
-                                        <canvas id="${papersChartId}"></canvas>
-                                    </div>
-                                `;
-                            }
-                            
-                            chartsHtml += '</div></div>';
-                            
-                            // Create regular items table
-                            let regularTableHtml = '';
-                            if (regularOffers.length > 0) {
-                                regularTableHtml = `
-                                    <h3>Regular Items</h3>
-                                    <table class="offers-table" id="${tableId}">
-                                        <thead>
-                                            <tr>
-                                                <th class="sortable" data-column="item" onclick="sortTable('${tableId}', 'item', this)">Item</th>
-                                                <th class="sortable" data-column="skill" onclick="sortTable('${tableId}', 'skill', this)">Skill</th>
-                                                <th class="sortable align-right" data-column="price" onclick="sortTable('${tableId}', 'price', this)">Price</th>
-                                                <th class="sortable align-right" data-column="quantity" onclick="sortTable('${tableId}', 'quantity', this)">Quantity</th>
-                                                <th class="sortable align-right" data-column="available" onclick="sortTable('${tableId}', 'available', this)">Available</th>
-                                                <th class="sortable align-right" data-column="expensive" onclick="sortTable('${tableId}', 'expensive', this)">Too Expensive</th>
-                                                <th class="sortable align-right" data-column="volume" onclick="sortTable('${tableId}', 'volume', this)">Volume</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${regularOffers.map(offer => {
-                                                const skillName = itemSkillMap[offer.ItemName] || 'N/A';
-                                                const itemData = marketAvailability[offer.ItemName];
-                                                
-                                                let inRangeQty = 0;
-                                                let outOfRangeQty = 0;
-                                                
-                                                if (itemData) {
-                                                    const buyPrice = offer.Price;
-                                                    const maxPrice = buyPrice * 1.2; // 20% higher
-                                                    
-                                                    itemData.byPrice.forEach(sellOffer => {
-                                                        // In range: any price > 0 and <= maxPrice (cheaper or up to 20% more)
-                                                        if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
-                                                            inRangeQty += sellOffer.quantity;
-                                                        } else if (sellOffer.price > maxPrice) {
-                                                            // Too expensive: price > maxPrice
-                                                            outOfRangeQty += sellOffer.quantity;
-                                                        }
-                                                    });
-                                                }
-                                                
-                                                const isAvailable = inRangeQty >= offer.Quantity;
-                                                const rowClass = isAvailable ? 'row-available' : '';
-                                                
-                                                const availableDisplay = inRangeQty > 0 ? `${inRangeQty}` : '-';
-                                                const expensiveDisplay = outOfRangeQty > 0 ? outOfRangeQty : '-';
-                                                
-                                                return `
-                                                <tr class="${rowClass}">
-                                                    <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
-                                                    <td data-value="${skillName}">${skillName}</td>
-                                                    <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
-                                                    <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
-                                                    <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
-                                                    <td class="align-right" data-value="${outOfRangeQty}">${expensiveDisplay}</td>
-                                                    <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
-                                                </tr>
-                                            `}).join('')}
-                                        </tbody>
-                                    </table>
-                                `;
-                            }
-                            
-                            // Create research papers section
-                            let papersHtml = '';
-                            if (researchPapers.length > 0) {
-                                // Calculate material requirements
-                                const totalPapers = researchPapers.reduce((sum, offer) => sum + offer.Quantity, 0);
-                                const paperNeeded = totalPapers * 20;
-                                const inkNeeded = totalPapers * 4;
-                                
-                                papersHtml = `
-                                    <h3 style="margin-top: 30px;">Research Papers (Modern)</h3>
-                                    <div class="papers-summary">
-                                        <h4>📝 Materials Required</h4>
-                                        <p><strong>Paper needed:</strong> ${paperNeeded} (${totalPapers} papers × 20)</p>
-                                        <p><strong>Ink needed:</strong> ${inkNeeded} (${totalPapers} papers × 4)</p>
-                                    </div>
-                                    <table class="offers-table" id="${papersTableId}">
-                                        <thead>
-                                            <tr>
-                                                <th class="sortable" data-column="item" onclick="sortTable('${papersTableId}', 'item', this)">Research Paper</th>
-                                                <th class="sortable align-right" data-column="price" onclick="sortTable('${papersTableId}', 'price', this)">Price</th>
-                                                <th class="sortable align-right" data-column="quantity" onclick="sortTable('${papersTableId}', 'quantity', this)">Quantity</th>
-                                                <th class="sortable align-right" data-column="available" onclick="sortTable('${papersTableId}', 'available', this)">Available</th>
-                                                <th class="sortable align-right" data-column="expensive" onclick="sortTable('${papersTableId}', 'expensive', this)">Too Expensive</th>
-                                                <th class="sortable align-right" data-column="volume" onclick="sortTable('${papersTableId}', 'volume', this)">Volume</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${researchPapers.map(offer => {
-                                                const itemData = marketAvailability[offer.ItemName];
-                                                
-                                                let inRangeQty = 0;
-                                                let outOfRangeQty = 0;
-                                                
-                                                if (itemData) {
-                                                    const buyPrice = offer.Price;
-                                                    const maxPrice = buyPrice * 1.2;
-                                                    
-                                                    itemData.byPrice.forEach(sellOffer => {
-                                                        if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
-                                                            inRangeQty += sellOffer.quantity;
-                                                        } else if (sellOffer.price > maxPrice) {
-                                                            outOfRangeQty += sellOffer.quantity;
-                                                        }
-                                                    });
-                                                }
-                                                
-                                                const isAvailable = inRangeQty >= offer.Quantity;
-                                                const rowClass = isAvailable ? 'row-available' : '';
-                                                
-                                                const availableDisplay = inRangeQty > 0 ? `${inRangeQty}` : '-';
-                                                const expensiveDisplay = outOfRangeQty > 0 ? outOfRangeQty : '-';
-                                                
-                                                return `
-                                                <tr class="${rowClass}">
-                                                    <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
-                                                    <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
-                                                    <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
-                                                    <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
-                                                    <td class="align-right" data-value="${outOfRangeQty}">${expensiveDisplay}</td>
-                                                    <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
-                                                </tr>
-                                            `}).join('')}
-                                        </tbody>
-                                    </table>
-                                `;
-                            }
-                            
-                            offersHtml = chartsHtml + regularTableHtml + papersHtml;
-                            
-                            // Store data for later chart creation
-                            storeCard.dataset.chartId = chartId;
-                            storeCard.dataset.skillVolumes = JSON.stringify(skillVolumes);
-                            storeCard.dataset.papersChartId = papersChartId;
-                            storeCard.dataset.paperVolumes = JSON.stringify(paperVolumes);
-                            storeCard.dataset.hasRegularOffers = regularOffers.length > 0;
-                            storeCard.dataset.hasPapers = researchPapers.length > 0;
-                        }
-                        
-                        storeCard.innerHTML = `
-                            <div class="store-header">
-                                <div class="store-name">
-                                    ${store.Name}
-                                    <button class="copy-btn" onclick="copyToClipboard(event, this)">📋 Copy for Discord</button>
-                                </div>
-                                <div class="store-owner">Owner: ${store.Owner || 'Unknown'} ${store.Enabled ? '✅ Active' : '❌ Inactive'}</div>
-                            </div>
-                            ${offersHtml}
-                        `;
-                        
-                        storesEl.appendChild(storeCard);
-                        
-                        // Create pie charts after DOM is updated
-                        if (storeCard.dataset.hasRegularOffers === 'true') {
-                            const chartId = storeCard.dataset.chartId;
-                            const skillVolumes = JSON.parse(storeCard.dataset.skillVolumes);
-                            createPieChart(chartId, skillVolumes);
-                        }
-                        
-                        if (storeCard.dataset.hasPapers === 'true') {
-                            const papersChartId = storeCard.dataset.papersChartId;
-                            const paperVolumes = JSON.parse(storeCard.dataset.paperVolumes);
-                            createPieChart(papersChartId, paperVolumes);
-                        }
                     });
+                    
+                    if (DEBUG_MODE) {
+                        console.log(`📋 Consolidated: ${allRegularOffers.length} regular, ${allModernPapers.length} modern papers, ${allAdvancedPapers.length} advanced papers, ${allCompletedItems.length} completed`);
+                    }
+                        
+                    // Sort all categories
+                    allRegularOffers.sort((a, b) => {
+                        const skillA = itemSkillMap[a.ItemName] || 'N/A';
+                        const skillB = itemSkillMap[b.ItemName] || 'N/A';
+                        const skillComparison = skillA.localeCompare(skillB);
+                        if (skillComparison !== 0) return skillComparison;
+                        return (a.ItemName || '').localeCompare(b.ItemName || '');
+                    });
+                    
+                    allModernPapers.sort((a, b) => (a.ItemName || '').localeCompare(b.ItemName || ''));
+                    allAdvancedPapers.sort((a, b) => (a.ItemName || '').localeCompare(b.ItemName || ''));
+                    allCompletedItems.sort((a, b) => (a.ItemName || '').localeCompare(b.ItemName || ''));
+                    
+                    // Calculate skill volumes for pie chart
+                    const skillVolumes = {};
+                    allRegularOffers.forEach(offer => {
+                        const fullSkill = itemSkillMap[offer.ItemName] || 'N/A';
+                        const skillName = fullSkill.replace(/\s+\d+$/, '');
+                        const volume = offer.Price * offer.Quantity;
+                        
+                        if (!skillVolumes[skillName]) {
+                            skillVolumes[skillName] = 0;
+                        }
+                        skillVolumes[skillName] += volume;
+                    });
+                    
+                    // Add Modern Papers
+                    let modernPaperVolume = 0;
+                    allModernPapers.forEach(offer => {
+                        modernPaperVolume += offer.Price * offer.Quantity;
+                    });
+                    if (modernPaperVolume > 0) {
+                        skillVolumes['Modern Paper'] = modernPaperVolume;
+                    }
+                    
+                    // Add Advanced Papers
+                    let advancedPaperVolume = 0;
+                    allAdvancedPapers.forEach(offer => {
+                        advancedPaperVolume += offer.Price * offer.Quantity;
+                    });
+                    if (advancedPaperVolume > 0) {
+                        skillVolumes['Advanced Paper'] = advancedPaperVolume;
+                    }
+                    
+                    // Calculate paper volumes for detailed pie charts
+                    const modernPaperVolumes = {};
+                    allModernPapers.forEach(offer => {
+                        const volume = offer.Price * offer.Quantity;
+                        modernPaperVolumes[offer.ItemName] = volume;
+                    });
+                    
+                    const advancedPaperVolumes = {};
+                    allAdvancedPapers.forEach(offer => {
+                        const volume = offer.Price * offer.Quantity;
+                        advancedPaperVolumes[offer.ItemName] = volume;
+                    });
+                    
+                    if (DEBUG_MODE) {
+                        console.log(`📊 Skill volumes:`, skillVolumes);
+                    }
+                    
+                    // Create single consolidated card
+                    const storeCard = document.createElement('div');
+                    storeCard.className = 'store-card';
+                        
+                    let offersHtml = '';
+                    const tableId = 'table-regular';
+                    const modernPapersTableId = 'table-modern-papers';
+                    const advancedPapersTableId = 'table-advanced-papers';
+                    const completedTableId = 'table-completed';
+                    const chartId = 'chart-skills';
+                    const modernPapersChartId = 'chart-modern-papers';
+                    const advancedPapersChartId = 'chart-advanced-papers';
+                            
+                    // Create charts section
+                    let chartsHtml = '<div class="chart-container"><div class="charts-wrapper">';
+                    
+                    if (Object.keys(skillVolumes).length > 0) {
+                        chartsHtml += `
+                            <div class="chart-box">
+                                <h3>All Items by Skill</h3>
+                                <canvas id="${chartId}"></canvas>
+                            </div>
+                        `;
+                    }
+                    
+                    if (Object.keys(modernPaperVolumes).length > 0) {
+                        chartsHtml += `
+                            <div class="chart-box">
+                                <h3>Modern Papers</h3>
+                                <canvas id="${modernPapersChartId}"></canvas>
+                            </div>
+                        `;
+                    }
+                    
+                    if (Object.keys(advancedPaperVolumes).length > 0) {
+                        chartsHtml += `
+                            <div class="chart-box">
+                                <h3>Advanced Papers</h3>
+                                <canvas id="${advancedPapersChartId}"></canvas>
+                            </div>
+                        `;
+                    }
+                    
+                    chartsHtml += '</div></div>';
+                            
+                    // Create regular items table
+                    let regularTableHtml = '';
+                    if (allRegularOffers.length > 0) {
+                        regularTableHtml = `
+                            <h3>Regular Items</h3>
+                            <table class="offers-table" id="${tableId}">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" data-column="item" onclick="sortTable('${tableId}', 'item', this)">Item</th>
+                                        <th class="sortable" data-column="store" onclick="sortTable('${tableId}', 'store', this)">Store</th>
+                                        <th class="sortable" data-column="skill" onclick="sortTable('${tableId}', 'skill', this)">Skill</th>
+                                        <th class="sortable align-right" data-column="price" onclick="sortTable('${tableId}', 'price', this)">Price</th>
+                                        <th class="sortable align-right" data-column="quantity" onclick="sortTable('${tableId}', 'quantity', this)">Quantity</th>
+                                        <th class="sortable align-right" data-column="available" onclick="sortTable('${tableId}', 'available', this)">Available</th>
+                                        <th class="sortable align-right" data-column="expensive" onclick="sortTable('${tableId}', 'expensive', this)">Too Expensive</th>
+                                        <th class="sortable align-right" data-column="volume" onclick="sortTable('${tableId}', 'volume', this)">Volume</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${allRegularOffers.map(createTableRow).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                    // Create Modern Papers table
+                    let modernPapersHtml = '';
+                    if (allModernPapers.length > 0) {
+                        const totalModernPapers = allModernPapers.reduce((sum, offer) => sum + offer.Quantity, 0);
+                        const paperNeeded = totalModernPapers * 20;
+                        const inkNeeded = totalModernPapers * 4;
+                        
+                        modernPapersHtml = `
+                            <h3 style="margin-top: 30px;">Research Papers (Modern)</h3>
+                            <div class="papers-summary">
+                                <h4>📝 Materials Required</h4>
+                                <p><strong>Paper needed:</strong> ${paperNeeded} (${totalModernPapers} papers × 20)</p>
+                                <p><strong>Ink needed:</strong> ${inkNeeded} (${totalModernPapers} papers × 4)</p>
+                            </div>
+                            <table class="offers-table" id="${modernPapersTableId}">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" data-column="item" onclick="sortTable('${modernPapersTableId}', 'item', this)">Research Paper</th>
+                                        <th class="sortable" data-column="store" onclick="sortTable('${modernPapersTableId}', 'store', this)">Store</th>
+                                        <th class="sortable align-right" data-column="price" onclick="sortTable('${modernPapersTableId}', 'price', this)">Price</th>
+                                        <th class="sortable align-right" data-column="quantity" onclick="sortTable('${modernPapersTableId}', 'quantity', this)">Quantity</th>
+                                        <th class="sortable align-right" data-column="available" onclick="sortTable('${modernPapersTableId}', 'available', this)">Available</th>
+                                        <th class="sortable align-right" data-column="expensive" onclick="sortTable('${modernPapersTableId}', 'expensive', this)">Too Expensive</th>
+                                        <th class="sortable align-right" data-column="volume" onclick="sortTable('${modernPapersTableId}', 'volume', this)">Volume</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${allModernPapers.map(createPaperTableRow).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                    
+                    // Create Advanced Papers table
+                    let advancedPapersHtml = '';
+                    if (allAdvancedPapers.length > 0) {
+                        advancedPapersHtml = `
+                            <h3 style="margin-top: 30px;">Research Papers (Advanced)</h3>
+                            <table class="offers-table" id="${advancedPapersTableId}">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" data-column="item" onclick="sortTable('${advancedPapersTableId}', 'item', this)">Research Paper</th>
+                                        <th class="sortable" data-column="store" onclick="sortTable('${advancedPapersTableId}', 'store', this)">Store</th>
+                                        <th class="sortable align-right" data-column="price" onclick="sortTable('${advancedPapersTableId}', 'price', this)">Price</th>
+                                        <th class="sortable align-right" data-column="quantity" onclick="sortTable('${advancedPapersTableId}', 'quantity', this)">Quantity</th>
+                                        <th class="sortable align-right" data-column="available" onclick="sortTable('${advancedPapersTableId}', 'available', this)">Available</th>
+                                        <th class="sortable align-right" data-column="expensive" onclick="sortTable('${advancedPapersTableId}', 'expensive', this)">Too Expensive</th>
+                                        <th class="sortable align-right" data-column="volume" onclick="sortTable('${advancedPapersTableId}', 'volume', this)">Volume</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${allAdvancedPapers.map(createPaperTableRow).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                    
+                    // Create Completed Items table
+                    let completedHtml = '';
+                    if (allCompletedItems.length > 0) {
+                        completedHtml = `
+                            <h3 style="margin-top: 30px;">Completed Items (Already Available)</h3>
+                            <table class="offers-table" id="${completedTableId}">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" data-column="item" onclick="sortTable('${completedTableId}', 'item', this)">Item</th>
+                                        <th class="sortable" data-column="store" onclick="sortTable('${completedTableId}', 'store', this)">Store</th>
+                                        <th class="sortable" data-column="skill" onclick="sortTable('${completedTableId}', 'skill', this)">Skill</th>
+                                        <th class="sortable align-right" data-column="price" onclick="sortTable('${completedTableId}', 'price', this)">Price</th>
+                                        <th class="sortable align-right" data-column="quantity" onclick="sortTable('${completedTableId}', 'quantity', this)">Quantity</th>
+                                        <th class="sortable align-right" data-column="available" onclick="sortTable('${completedTableId}', 'available', this)">Available</th>
+                                        <th class="sortable align-right" data-column="expensive" onclick="sortTable('${completedTableId}', 'expensive', this)">Too Expensive</th>
+                                        <th class="sortable align-right" data-column="volume" onclick="sortTable('${completedTableId}', 'volume', this)">Volume</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${allCompletedItems.map(createCompletedRow).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                    
+                    offersHtml = chartsHtml + regularTableHtml + modernPapersHtml + advancedPapersHtml + completedHtml;
+                    
+                    storeCard.innerHTML = `
+                        <div class="store-header">
+                            <div class="store-name">
+                                All Meteor Stores Consolidated
+                                <button class="copy-btn" onclick="copyToClipboard(event, this)">📋 Copy for Discord</button>
+                            </div>
+                        </div>
+                        ${offersHtml}
+                    `;
+                    
+                    // Store data for Discord copy
+                    const allOffers = [...allRegularOffers, ...allModernPapers, ...allAdvancedPapers, ...allCompletedItems];
+                    storeCard.dataset.storeName = 'All Meteor Stores';
+                    storeCard.dataset.storeOffers = JSON.stringify(allOffers.map(offer => ({
+                        ...offer,
+                        Skill: itemSkillMap[offer.ItemName] || 'N/A'
+                    })));
+                    storesEl.appendChild(storeCard);
+                    
+                    // Create pie charts after DOM is updated
+                    if (Object.keys(skillVolumes).length > 0) {
+                        createPieChart(chartId, skillVolumes);
+                    }
+                    
+                    if (Object.keys(modernPaperVolumes).length > 0) {
+                        createPieChart(modernPapersChartId, modernPaperVolumes);
+                    }
+                    
+                    if (Object.keys(advancedPaperVolumes).length > 0) {
+                        createPieChart(advancedPapersChartId, advancedPaperVolumes);
+                    }
                 }
                 
                 lastUpdateEl.textContent = `Last updated: ${new Date().toLocaleString('en-US')}`;
@@ -993,12 +1065,13 @@
         function getColumnIndex(column) {
             const columnMap = {
                 'item': 1,
-                'skill': 2,
-                'price': 3,
-                'quantity': 4,
-                'available': 5,
-                'expensive': 6,
-                'volume': 7
+                'store': 2,
+                'skill': 3,
+                'price': 4,
+                'quantity': 5,
+                'available': 6,
+                'expensive': 7,
+                'volume': 8
             };
             return columnMap[column];
         }

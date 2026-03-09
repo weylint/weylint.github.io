@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍽 Dinner Party Helper</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #faf6ef;
+    --parchment: #f0e8d8;
+    --warm-brown: #3d2b1f;
+    --amber: #c8860a;
+    --amber-light: #e6a c2f;
+    --rust: #b84c2a;
+    --sage: #6b7c5a;
+    --sage-light: #d4ddc8;
+    --charcoal: #2a2420;
+    --border: #d4c5a9;
+    --shadow: rgba(61,43,31,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--warm-brown);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--warm-brown);
+    color: var(--cream);
+    padding: 2.5rem 2rem 2rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 20px,
+      rgba(255,255,255,0.02) 20px,
+      rgba(255,255,255,0.02) 40px
+    );
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    position: relative;
+  }
+  header h1 span { color: #e8c068; }
+  header p {
+    margin-top: 0.5rem;
+    opacity: 0.7;
+    font-size: 0.95rem;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    position: relative;
+  }
+
+  /* LOADING / ERROR */
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 2rem;
+    gap: 1rem;
+  }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--border);
+    border-top-color: var(--amber);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #error-msg {
+    display: none;
+    background: #fdf0ed;
+    border: 1.5px solid var(--rust);
+    color: var(--rust);
+    border-radius: 10px;
+    padding: 1.5rem 2rem;
+    max-width: 520px;
+    margin: 3rem auto;
+    text-align: center;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  /* MAIN LAYOUT */
+  #app { display: none; }
+  .layout {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 2rem;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  /* CONTROLS BAR */
+  .controls {
+    background: var(--parchment);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .controls label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--amber);
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .controls input[type=text] {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.85rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: var(--warm-brown);
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 200px;
+  }
+  .controls input[type=text]:focus { border-color: var(--amber); }
+
+  .skill-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .skill-tab-wrap {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+    transition: border-color 0.18s;
+  }
+  .skill-tab-wrap:has(.skill-tab.active) {
+    border-color: var(--warm-brown);
+  }
+  .skill-tab-wrap:has(.all-tab.active) {
+    border-color: var(--amber);
+  }
+  .skill-tab {
+    padding: 0.45rem 1.1rem;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    color: var(--warm-brown);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s;
+    letter-spacing: 0.02em;
+  }
+  .skill-tab:hover { color: var(--amber); }
+  .skill-tab.active {
+    background: var(--warm-brown);
+    color: var(--cream);
+  }
+  .skill-tab.all-tab.active {
+    background: var(--amber);
+  }
+  .skill-tab-select {
+    font-size: 0.88rem;
+    padding: 0.35rem 0.6rem 0.35rem 0;
+    cursor: pointer;
+    color: #bbb;
+    border-left: 1px solid var(--border);
+    padding-left: 0.55rem;
+    line-height: 1;
+    user-select: none;
+    transition: color 0.15s;
+  }
+  .skill-tab-select:hover { color: var(--sage); }
+  .skill-tab-select.some-on { color: var(--amber); }
+  .skill-tab-select.all-on { color: var(--sage); }
+
+  /* SECTION HEADERS */
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--warm-brown);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  .section-title small {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #999;
+  }
+
+  /* RECIPE CARDS */
+  .recipes-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .recipe-card {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+  .recipe-card:hover { box-shadow: 0 4px 16px var(--shadow); }
+  .recipe-card.selected {
+    border-color: var(--sage);
+    box-shadow: 0 0 0 3px rgba(107,124,90,0.15);
+  }
+  .recipe-card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .recipe-checkbox {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 5px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.18s;
+    background: white;
+  }
+  .recipe-card.selected .recipe-checkbox {
+    background: var(--sage);
+    border-color: var(--sage);
+  }
+  .recipe-checkbox svg { display: none; }
+  .recipe-card.selected .recipe-checkbox svg { display: block; }
+  .recipe-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    flex: 1;
+  }
+  .recipe-meta {
+    display: flex; gap: 0.5rem; flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .badge-skill { background: #f0ede6; color: var(--amber); border: 1px solid #e0d5be; }
+  .badge-table { background: #eef0f8; color: #5566aa; border: 1px solid #d0d5ea; }
+  .badge-excluded { background: #f5f0f8; color: #aa88bb; border: 1px solid #ddc8ee; font-style: italic; }
+
+  /* RECIPE BODY */
+  .recipe-body {
+    padding: 0 1.25rem 1.25rem;
+    display: none;
+    border-top: 1px solid var(--border);
+  }
+  .recipe-card.expanded .recipe-body { display: block; }
+  .expand-arrow {
+    transition: transform 0.2s;
+    color: #aaa;
+    flex-shrink: 0;
+  }
+  .recipe-card.expanded .expand-arrow { transform: rotate(180deg); }
+
+  /* QUANTITY ROW */
+  .qty-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.85rem 0;
+  }
+  .qty-row label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+  }
+  .qty-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .qty-stepper button {
+    background: var(--parchment);
+    border: none;
+    width: 32px; height: 32px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-weight: 500;
+    color: var(--warm-brown);
+  }
+  .qty-stepper button:hover { background: var(--border); }
+  .qty-stepper input {
+    width: 48px;
+    text-align: center;
+    border: none;
+    border-left: 1.5px solid var(--border);
+    border-right: 1.5px solid var(--border);
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--warm-brown);
+    padding: 0.3rem 0;
+    outline: none;
+    background: white;
+  }
+
+  /* VARIANT SELECTOR */
+  .variant-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    margin: 0.6rem 0 0.3rem;
+  }
+  .variant-tabs {
+    display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem;
+  }
+  .variant-btn {
+    padding: 0.3rem 0.85rem;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: white;
+    font-family: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--warm-brown);
+  }
+  .variant-btn:hover { border-color: var(--rust); }
+  .variant-btn.active {
+    background: var(--rust);
+    border-color: var(--rust);
+    color: white;
+  }
+
+  /* INGREDIENTS TABLE */
+  .ingredients-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+  .ingredients-table th {
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #aaa;
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .ingredients-table td {
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid #f0ebe0;
+    vertical-align: middle;
+  }
+  .ingredients-table tr:last-child td { border-bottom: none; }
+  .ing-name { font-weight: 500; }
+  .ing-tag { color: var(--sage); font-style: italic; font-size: 0.82rem; }
+  .ing-static { 
+    font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 999px; 
+    background: #f0f0f0; color: #888;
+  }
+  .ing-dynamic { background: #fef3e2; color: var(--amber); }
+  .modifier-cell { width: 140px; }
+  .modifier-wrap {
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .modifier-wrap input[type=range] {
+    -webkit-appearance: none;
+    width: 80px; height: 4px;
+    background: linear-gradient(to right, var(--amber) 0%, var(--amber) var(--pct, 100%), var(--border) var(--pct, 100%), var(--border) 100%);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  .modifier-wrap input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--amber);
+    border: 2px solid white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    cursor: pointer;
+  }
+  .modifier-pct {
+    font-size: 0.78rem; font-weight: 600;
+    color: var(--amber); min-width: 34px; text-align: right;
+  }
+  .products-row {
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--sage);
+    display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;
+  }
+  .products-row strong { color: var(--sage); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .product-chip {
+    background: var(--sage-light);
+    border-radius: 5px;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.8rem;
+    color: var(--sage);
+    font-weight: 500;
+  }
+
+  /* SHOPPING LIST PANEL */
+  .panel {
+    background: var(--warm-brown);
+    color: var(--cream);
+    border-radius: 18px;
+    padding: 1.5rem;
+    position: sticky;
+    top: 1.5rem;
+  }
+  .panel h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    color: #e8c068;
+    margin-bottom: 0.25rem;
+  }
+  .panel-subtitle {
+    font-size: 0.78rem;
+    opacity: 0.6;
+    margin-bottom: 1.25rem;
+    letter-spacing: 0.04em;
+  }
+  .shopping-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    opacity: 0.4;
+    font-size: 0.9rem;
+  }
+  .shopping-empty .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .shopping-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.2rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    gap: 0.5rem;
+  }
+  .shopping-item:last-child { border-bottom: none; }
+  .shopping-item-name { font-size: 0.82rem; font-weight: 400; flex: 1; line-height: 1.3; }
+  .shopping-item-name.is-tag { font-style: italic; color: #c8b892; }
+  .shopping-item-qty {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e8c068;
+    white-space: nowrap;
+  }
+  .shopping-section {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin: 1rem 0 0.4rem;
+  }
+  .panel-divider { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 1rem 0; }
+  .selected-summary {
+    font-size: 0.78rem;
+    opacity: 0.6;
+    margin-bottom: 0.6rem;
+  }
+  /* SKILL GROUPS IN SHOPPING LIST */
+  .sl-skill-group { margin-bottom: 0; }
+  .sl-skill-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0 0.2rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .sl-skill-group:first-child .sl-skill-header { margin-top: 0; border-top: none; }
+  .sl-skill-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--skill-color, #888);
+    flex-shrink: 0;
+  }
+  .sl-skill-name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--skill-color, #888);
+    flex: 1;
+  }
+  .sl-skill-count {
+    font-size: 0.68rem;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.4);
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+    font-weight: 500;
+  }
+
+  /* COPY BTN */
+  .copy-btn {
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 0.7rem;
+    background: #e8c068;
+    color: var(--warm-brown);
+    border: none;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: background 0.2s;
+  }
+  .copy-btn:hover { background: #f0cf7a; }
+  .copy-btn.copied { background: var(--sage); color: white; }
+
+  /* EMPTY STATES */
+  .no-results {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #aaa;
+  }
+  .no-results .icon { font-size: 3rem; margin-bottom: 0.5rem; }
+
+  /* GLOBAL SERVINGS */
+  .global-servings-bar {
+    background: var(--warm-brown);
+    color: var(--cream);
+    border-radius: 14px;
+    padding: 1.1rem 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .gs-label { display: flex; align-items: center; gap: 1rem; }
+  .gs-icon { font-size: 1.8rem; }
+  .gs-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    color: #e8c068;
+    font-weight: 700;
+  }
+  .gs-sub { font-size: 0.75rem; opacity: 0.55; margin-top: 0.15rem; }
+  .gs-stepper-wrap { display: flex; align-items: center; gap: 0.75rem; }
+  .gs-stepper input { width: 64px; font-size: 1.15rem; font-weight: 700; }
+  .gs-stepper button {
+    background: rgba(255,255,255,0.12);
+    color: var(--cream);
+    width: 38px; height: 38px;
+    font-size: 1.2rem;
+  }
+  .gs-stepper button:hover { background: rgba(255,255,255,0.22); }
+  .gs-unit { font-size: 0.82rem; opacity: 0.55; white-space: nowrap; }
+
+  /* CRAFTS INFO CHIP */
+  .crafts-info {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.75rem 0 0.5rem;
+    background: #f7f3ec;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.82rem;
+    color: var(--warm-brown);
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .crafts-info .ci-crafts {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--amber);
+  }
+  .crafts-info .ci-arrow { color: #ccc; }
+  .crafts-info .ci-produces {
+    font-weight: 600;
+    color: var(--sage);
+  }
+  .crafts-info .ci-target { color: #aaa; font-size: 0.78rem; }
+  .crafts-override {
+    display: flex; align-items: center; gap: 0.5rem; margin-left: auto;
+  }
+  .crafts-override label { font-size: 0.72rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; }
+  .crafts-override .qty-stepper input { width: 44px; font-size: 0.88rem; }
+  .crafts-override .qty-stepper button { width: 26px; height: 26px; font-size: 0.9rem; }
+  .reset-override {
+    font-size: 0.7rem;
+    color: var(--rust);
+    cursor: pointer;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 0;
+  }
+
+  /* GLOBAL MODIFIER */
+  .global-modifier {
+    background: var(--parchment);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .global-modifier label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--amber);
+    flex-shrink: 0;
+  }
+  .global-modifier .modifier-wrap { flex: 1; min-width: 180px; }
+  .global-modifier .modifier-wrap input[type=range] { width: 100%; }
+  .global-modifier p {
+    font-size: 0.8rem;
+    color: #888;
+    flex-basis: 100%;
+    margin-top: -0.25rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🍽 Eco <span>Dinner Party</span> Helper</h1>
+  <p>Cooking Recipe Planner & Ingredient Calculator</p>
+</header>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:#888;font-size:0.9rem;">Loading recipes from server…</p>
+</div>
+<div id="error-msg"></div>
+
+<div id="app">
+<div class="layout">
+  <!-- LEFT: RECIPE LIST -->
+  <div>
+    <!-- Skill Tabs -->
+    <div class="skill-tabs" id="skillTabs"></div>
+
+    <!-- Search + Global Modifier -->
+    <div class="controls">
+      <div>
+        <label>Search</label>
+        <input type="text" id="searchInput" placeholder="Filter recipes…">
+      </div>
+    </div>
+
+    <div class="global-servings-bar">
+      <div class="gs-label">
+        <span class="gs-icon">🍽</span>
+        <div>
+          <div class="gs-title">Servings per dish</div>
+          <div class="gs-sub">Crafts are calculated automatically — rounded up to meet this target</div>
+        </div>
+      </div>
+      <div class="gs-stepper-wrap">
+        <div class="qty-stepper gs-stepper">
+          <button onclick="changeGlobalServings(-1)">−</button>
+          <input type="number" id="globalServingsInput" min="1" max="999" value="5"
+            onchange="setGlobalServings(this.value)">
+          <button onclick="changeGlobalServings(1)">+</button>
+        </div>
+        <span class="gs-unit">per dish</span>
+      </div>
+    </div>
+
+    <div class="global-modifier">
+      <label>🔧 Global Skill Modifier</label>
+      <div class="modifier-wrap">
+        <input type="range" min="0" max="100" value="100" id="globalModifier" oninput="applyGlobalModifier(this.value)">
+        <span class="modifier-pct" id="globalModifierPct">100%</span>
+      </div>
+      <p>Sets the default efficiency for all <em>dynamic</em> ingredients (non-static). You can override per-ingredient below.</p>
+    </div>
+
+    <!-- Section title -->
+    <div class="section-title">
+      Recipes <small id="recipeCount"></small>
+    </div>
+    <div class="recipes-list" id="recipesList"></div>
+  </div>
+
+  <!-- RIGHT: SHOPPING LIST -->
+  <div>
+    <div class="panel">
+      <h2>🛒 Shopping List</h2>
+      <div class="panel-subtitle">Ingredients for selected recipes</div>
+      <div id="shoppingContent">
+        <div class="shopping-empty">
+          <div class="icon">🧺</div>
+          Select recipes to see your ingredient list
+        </div>
+      </div>
+      <button class="copy-btn" id="copyBtn" onclick="copyShoppingList()">📋 Copy to Clipboard</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// Skills shown in tabs - Advanced Cooking split into Stove/Kitchen, Campfire Cooking split into Salads/Stews
+const COOKING_SKILLS = [
+  "Campfire Cooking (Salads)",
+  "Campfire Cooking (Stews)",
+  "Campfire Cooking (Fried)",
+  "Campfire Cooking (Other)",
+  "Cooking",
+  "Baking (Baked)",
+  "Baking (Other)",
+  "Advanced Cooking (Stove)",
+  "Advanced Cooking (Kitchen)",
+  "Advanced Baking"
+];
+
+// The actual skill names as they appear in recipe data
+const RAW_COOKING_SKILLS = [
+  "Campfire Cooking",
+  "Cooking",
+  "Baking",
+  "Advanced Cooking",
+  "Advanced Baking"
+];
+
+// Campfire recipes explicitly assigned to "Salads" tab
+// (everything else with Campfire Cooking goes to Stews)
+const CAMPFIRE_SALADS = new Set([
+  "Topped Porridge",
+  "Charred Sausage",
+  "Campfire Roast",
+  // Salad-type recipes (containing "Salad" in their name) are also auto-assigned below
+]);
+
+// Items excluded from "Select All" by default
+const EXCLUDED_FROM_SELECT_ALL = new Set([
+  "Infused Oil",
+  "Refined Tallow",
+  "Refine Tallow",
+  "Advanced Cooking Upgrade",
+  "Boiled Rice",
+  "Culinary Research Paper Modern",
+  "Advanced Baking Upgrade",
+  "Culinary Research Paper Advanced",
+  "Leavened Dough",
+  "Pastry Dough",
+  "Baking Upgrade",
+  "Culinary Research Paper Advanced Meat",
+  "Melting Fat",
+  "Meat Stock",
+  "Vegetable Stock",
+  "Vegetable Medley",
+  "Cooking Upgrade",
+  "Rice Noodles",
+  "Fish Stock",
+  "Balanced Meal",
+  "Culinary Research Paper Basic",
+  "Enhanced Meal",
+  "Culinary Research Paper Basic Meat",
+  "Taro Fries",
+]);
+
+// For multi-variant recipes, specify which variant key should be the preferred default.
+// Recipes NOT matching the preferred variant are excluded from Select All.
+// Key: recipe Key, Value: the variant Name that should be selected/included.
+const PREFERRED_VARIANTS = {
+  "FruitSalad": "Mixed Fruit Salad",
+  "BasicSalad": "Grassland Salad",
+  // Also handle by recipe key patterns - we resolve these after load
+};
+// Resolved at load time: recipeKey -> preferred variantKey
+let preferredVariantKeys = {};
+
+const EXCLUDED_TABLES = new Set(["Research Table", "Laboratory"]);
+
+function isExcludedByDefault(recipe) {
+  // Exclude if crafted at Research Table or Laboratory
+  if (EXCLUDED_TABLES.has(recipe.CraftingTable)) return true;
+  // Exclude Campfire Cooking level 0
+  if (recipe.SkillNeeds && recipe.SkillNeeds.some(s => s.Skill === 'Campfire Cooking' && s.Level === 0)) return true;
+  // Exclude if any variant's primary product name is in the exclusion set
+  for (const variant of (recipe.Variants || [])) {
+    const primaryName = variant.Name || '';
+    if (EXCLUDED_FROM_SELECT_ALL.has(primaryName)) return true;
+    for (const p of (variant.Products || [])) {
+      if (EXCLUDED_FROM_SELECT_ALL.has(p.Name)) return true;
+    }
+  }
+  // Exclude multi-variant recipes where no preferred variant is set
+  // (they will have a preferred variant entry - absence means exclude whole recipe)
+  if (preferredVariantKeys[recipe.Key] === '__none__') return true;
+  return false;
+}
+
+// Returns the display skill name (splits Advanced Cooking by table, Campfire Cooking by type)
+function isCampfireSalad(recipe) {
+  const primaryName = (recipe.Variants && recipe.Variants[0] && recipe.Variants[0].Name) || recipe.Key;
+  if (CAMPFIRE_SALADS.has(primaryName)) return true;
+  // Auto-assign anything with "Salad" in the name
+  if (primaryName.toLowerCase().includes('salad')) return true;
+  return false;
+}
+
+function getDisplaySkill(recipe) {
+  const skill = recipe.SkillNeeds && recipe.SkillNeeds[0] && recipe.SkillNeeds[0].Skill;
+  if (skill === 'Campfire Cooking') {
+    if (isCampfireSalad(recipe)) return 'Campfire Cooking (Salads)';
+    const primaryName = (recipe.Variants && recipe.Variants[0] && recipe.Variants[0].Name) || recipe.Key;
+    if (primaryName.toLowerCase().includes('stew')) return 'Campfire Cooking (Stews)';
+    if (primaryName.toLowerCase().includes('fried')) return 'Campfire Cooking (Fried)';
+    return 'Campfire Cooking (Other)';
+  }
+  if (skill === 'Baking') {
+    const primaryName = (recipe.Variants && recipe.Variants[0] && recipe.Variants[0].Name) || recipe.Key;
+    if (primaryName.startsWith('Baked')) return 'Baking (Baked)';
+    return 'Baking (Other)';
+  }
+  if (skill === 'Advanced Cooking') {
+    const table = recipe.CraftingTable || '';
+    if (table.toLowerCase().includes('kitchen')) return 'Advanced Cooking (Kitchen)';
+    return 'Advanced Cooking (Stove)';
+  }
+  return skill || 'No Skill Required';
+}
+
+// State
+let allRecipes = [];
+let filteredRecipes = [];
+let selectedSkill = 'All';
+let searchQuery = '';
+// Per-recipe state: { recipeKey: { selected, qty, variantKey, expanded, modifiers: { ingIndex: pct } } }
+let recipeState = {};
+
+// ---- FETCH ----
+async function loadRecipes() {
+  try {
+    const res = await fetch('http://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    allRecipes = data.Recipes.filter(r => {
+      if (!r.SkillNeeds || r.SkillNeeds.length === 0) return false;
+      if (EXCLUDED_TABLES.has(r.CraftingTable)) return false;
+      return r.SkillNeeds.some(s => RAW_COOKING_SKILLS.includes(s.Skill));
+    });
+
+    // Sort by: display skill (tab order), then skill level, then name
+    const skillTabOrder = COOKING_SKILLS; // use display skill order
+    allRecipes.sort((a, b) => {
+      const aDSkill = getDisplaySkill(a);
+      const bDSkill = getDisplaySkill(b);
+      const aTabIdx = skillTabOrder.indexOf(aDSkill);
+      const bTabIdx = skillTabOrder.indexOf(bDSkill);
+      if (aTabIdx !== bTabIdx) return aTabIdx - bTabIdx;
+      const aLevel = (a.SkillNeeds[0] && a.SkillNeeds[0].Level) || 0;
+      const bLevel = (b.SkillNeeds[0] && b.SkillNeeds[0].Level) || 0;
+      if (aLevel !== bLevel) return aLevel - bLevel;
+      const aName = (a.Variants && a.Variants[0] && a.Variants[0].Name) || a.Key;
+      const bName = (b.Variants && b.Variants[0] && b.Variants[0].Name) || b.Key;
+      return aName.localeCompare(bName);
+    });
+    // Resolve preferred variants: find recipes whose variants include the preferred name
+    // and set that variant as the default. Map by searching variant names.
+    const PREFERRED_VARIANT_NAMES = {
+      "Fruit Salad": "Mixed Fruit Salad",
+      "Basic Salad":  "Grassland Salad",
+    };
+    preferredVariantKeys = {};
+    allRecipes.forEach(r => {
+      // Match recipe by its first variant's base name or key
+      for (const [recipeBaseName, preferredVariantName] of Object.entries(PREFERRED_VARIANT_NAMES)) {
+        // Check if this recipe's key or any variant name loosely matches the base name
+        const isMatch = r.Key.toLowerCase().includes(recipeBaseName.toLowerCase().replace(' ', '')) ||
+          (r.Variants && r.Variants.some(v => v.Name && v.Name === recipeBaseName));
+        if (isMatch) {
+          const found = r.Variants && r.Variants.find(v => v.Name === preferredVariantName);
+          if (found) {
+            preferredVariantKeys[r.Key] = found.Key;
+          }
+        }
+      }
+    });
+
+    // Init state
+    allRecipes.forEach(r => {
+      // Use preferred variant if set, else game default, else first
+      const preferred = preferredVariantKeys[r.Key];
+      const defaultVariantKey = preferred || r.DefaultVariant || (r.Variants && r.Variants[0] && r.Variants[0].Key);
+      recipeState[r.Key] = {
+        selected: false,
+        variantKey: defaultVariantKey,
+        expanded: false,
+        modifiers: {},
+        servingsOverride: null
+      };
+    });
+
+    // Build map: productName -> skill (or "No Skill" / "Raw / Gathered")
+    // Uses ALL recipes (not just cooking ones) so we can label every ingredient
+    buildProductSkillMap(data.Recipes);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    buildSkillTabs();
+    applyFilters();
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    const err = document.getElementById('error-msg');
+    err.style.display = 'block';
+    err.innerHTML = `<strong>⚠️ Could not load recipes</strong><br>Failed to connect to the Eco server.<br><small style="opacity:0.7">${e.message}</small>`;
+  }
+}
+
+// ---- SKILL TABS ----
+function getRecipesForTab(skill) {
+  if (skill === 'All') return allRecipes;
+  return allRecipes.filter(r => getDisplaySkill(r) === skill);
+}
+
+function buildSkillTabs() {
+  const container = document.getElementById('skillTabs');
+  const all = ['All', ...COOKING_SKILLS];
+  container.innerHTML = all.map(skill => {
+    const recipesInSkill = getRecipesForTab(skill);
+    const selectableRecipes = recipesInSkill.filter(r => !isExcludedByDefault(r));
+    const count = recipesInSkill.length;
+    const allSelected = selectableRecipes.length > 0 && selectableRecipes.every(r => recipeState[r.Key].selected);
+    const someSelected = selectableRecipes.some(r => recipeState[r.Key].selected);
+
+    const selectBtn = `<span class="skill-tab-select ${allSelected?'all-on':someSelected?'some-on':''}"
+      onclick="toggleSkillGroup('${skill}');event.stopPropagation()"
+      title="${allSelected ? 'Deselect all' : 'Select all'} ${skill} recipes">
+      ${allSelected ? '☑' : someSelected ? '⊟' : '☐'}
+    </span>`;
+
+    return `<div class="skill-tab-wrap">
+      <button class="skill-tab ${skill==='All'?'all-tab':''} ${selectedSkill===skill?'active':''}"
+        onclick="selectSkill('${skill}')">${skill} <span style="opacity:0.5;font-size:0.75em">${count}</span></button>${selectBtn}
+    </div>`;
+  }).join('');
+}
+
+function toggleSkillGroup(skill) {
+  const recipesInSkill = getRecipesForTab(skill);
+  // Only operate on non-excluded recipes
+  const selectableRecipes = recipesInSkill.filter(r => !isExcludedByDefault(r));
+  const allSelected = selectableRecipes.every(r => recipeState[r.Key].selected);
+  selectableRecipes.forEach(r => { recipeState[r.Key].selected = !allSelected; });
+  buildSkillTabs();
+  renderRecipes();
+  updateShoppingList();
+}
+
+function selectSkill(skill) {
+  selectedSkill = skill;
+  buildSkillTabs();
+  applyFilters();
+}
+
+// ---- FILTER ----
+function applyFilters() {
+  const q = searchQuery.toLowerCase().trim();
+  filteredRecipes = allRecipes.filter(r => {
+    const skillMatch = selectedSkill === 'All' || getDisplaySkill(r) === selectedSkill;
+    const nameMatch = !q || r.Key.toLowerCase().includes(q) ||
+      (r.Variants && r.Variants.some(v => v.Name && v.Name.toLowerCase().includes(q)));
+    return skillMatch && nameMatch;
+  });
+  document.getElementById('recipeCount').textContent = `${filteredRecipes.length} recipes`;
+  renderRecipes();
+}
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  applyFilters();
+});
+
+// ---- GLOBAL MODIFIER ----
+function applyGlobalModifier(val) {
+  document.getElementById('globalModifierPct').textContent = val + '%';
+  const slider = document.getElementById('globalModifier');
+  slider.style.setProperty('--pct', val + '%');
+  // Apply to all dynamic ingredients that haven't been individually set
+  // (We'll use the global value as default when computing, not override per-ingredient)
+  globalModValue = parseInt(val);
+  updateShoppingList();
+}
+let globalModValue = 100;
+let globalServings = 5;
+
+// Returns the primary product amount for a variant (the first product matching variant name, or first product)
+function getPrimaryProductAmt(recipe, variant) {
+  if (!variant || !variant.Products || variant.Products.length === 0) return 1;
+  // prefer product whose name matches variant name
+  const match = variant.Products.find(p => p.Name === variant.Name);
+  return (match || variant.Products[0]).Ammount || 1;
+}
+
+// Returns number of crafts needed to reach target servings (ceil)
+function craftsNeeded(recipe, targetServings) {
+  const st = recipeState[recipe.Key];
+  if (st.servingsOverride !== null) return st.servingsOverride;
+  const variant = recipe.Variants.find(v => v.Key === st.variantKey) || recipe.Variants[0];
+  const perCraft = getPrimaryProductAmt(recipe, variant);
+  return Math.ceil(targetServings / perCraft);
+}
+
+function changeGlobalServings(delta) {
+  globalServings = Math.max(1, globalServings + delta);
+  document.getElementById('globalServingsInput').value = globalServings;
+  // Re-render all visible cards + shopping list
+  filteredRecipes.forEach(r => rerenderCard(r.Key));
+  updateShoppingList();
+}
+
+function setGlobalServings(val) {
+  globalServings = Math.max(1, parseInt(val) || 1);
+  document.getElementById('globalServingsInput').value = globalServings;
+  filteredRecipes.forEach(r => rerenderCard(r.Key));
+  updateShoppingList();
+}
+
+function setServingsOverride(key, val) {
+  recipeState[key].servingsOverride = Math.max(1, parseInt(val) || 1);
+  rerenderCard(key);
+  updateShoppingList();
+}
+
+function clearServingsOverride(key) {
+  recipeState[key].servingsOverride = null;
+  rerenderCard(key);
+  updateShoppingList();
+}
+
+// ---- RENDER RECIPES ----
+function renderRecipes() {
+  const container = document.getElementById('recipesList');
+  if (filteredRecipes.length === 0) {
+    container.innerHTML = `<div class="no-results"><div class="icon">🔍</div><p>No recipes found</p></div>`;
+    return;
+  }
+  container.innerHTML = filteredRecipes.map(r => renderCard(r)).join('');
+}
+
+function renderCard(recipe) {
+  const st = recipeState[recipe.Key];
+  const variant = recipe.Variants.find(v => v.Key === st.variantKey) || recipe.Variants[0];
+  const displaySkill = getDisplaySkill(recipe);
+  const skillLevel = recipe.SkillNeeds && recipe.SkillNeeds[0] ? recipe.SkillNeeds[0].Level : 0;
+  const skillBadges = `<span class="badge badge-skill">${displaySkill} ${skillLevel}</span>`;
+  const tableBadge = `<span class="badge badge-table">${recipe.CraftingTable}</span>`;
+  const variantBadge = recipe.NumberOfVariants > 1
+    ? `<span class="badge badge-variant">${recipe.NumberOfVariants} variants</span>` : '';
+  const excluded = isExcludedByDefault(recipe);
+  const excludedBadge = excluded ? `<span class="badge badge-excluded" title="Excluded from Select All">skip</span>` : '';
+
+  const variantTabs = recipe.NumberOfVariants > 1 ? `
+    <div class="variant-label">Variant</div>
+    <div class="variant-tabs">
+      ${recipe.Variants.map(v => `
+        <button class="variant-btn ${v.Key === st.variantKey ? 'active' : ''}"
+          onclick="selectVariant('${recipe.Key}','${v.Key}');event.stopPropagation()">
+          ${v.Name}
+        </button>`).join('')}
+    </div>` : '';
+
+  const ingsHtml = variant ? renderIngredients(recipe.Key, variant) : '';
+  const productsHtml = variant ? renderProducts(variant) : '';
+
+  const crafts = craftsNeeded(recipe, globalServings);
+  const perCraft = getPrimaryProductAmt(recipe, variant);
+  const totalProduced = crafts * perCraft;
+  const isOverride = st.servingsOverride !== null;
+  const overrideBadge = isOverride
+    ? `<button class="reset-override" onclick="clearServingsOverride('${recipe.Key}');event.stopPropagation()" title="Reset to global servings">↩ reset</button>`
+    : '';
+
+  const craftsInfoBlock = `
+    <div class="crafts-info">
+      <span class="ci-crafts">${crafts}×</span>
+      <span style="font-size:0.8rem;color:#888">crafts</span>
+      <span class="ci-arrow">→</span>
+      <span class="ci-produces">${totalProduced} ${variant ? variant.Name : recipe.Key}</span>
+      ${!isOverride ? `<span class="ci-target">(target: ${globalServings})</span>` : `<span class="ci-target" style="color:var(--rust)">custom override</span>`}
+      <div class="crafts-override" onclick="event.stopPropagation()">
+        <label>Override crafts:</label>
+        <div class="qty-stepper">
+          <button onclick="setServingsOverride('${recipe.Key}', ${crafts}-1);event.stopPropagation()">−</button>
+          <input type="number" min="1" max="999" value="${crafts}"
+            onchange="setServingsOverride('${recipe.Key}',this.value)" onclick="event.stopPropagation()">
+          <button onclick="setServingsOverride('${recipe.Key}', ${crafts}+1);event.stopPropagation()">+</button>
+        </div>
+        ${overrideBadge}
+      </div>
+    </div>`;
+
+  return `<div class="recipe-card ${st.selected?'selected':''} ${st.expanded?'expanded':''}" id="card-${recipe.Key}">
+    <div class="recipe-card-header" onclick="toggleCard('${recipe.Key}')">
+      <div class="recipe-checkbox" onclick="toggleSelect('${recipe.Key}');event.stopPropagation()">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+          <path d="M1 5L4.5 8.5L11 1.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="recipe-name">${variant ? variant.Name : recipe.Key}</div>
+      <div class="recipe-meta">${skillBadges}${tableBadge}${variantBadge}${excludedBadge}</div>
+      <div style="font-size:0.78rem;color:var(--sage);font-weight:600;white-space:nowrap;flex-shrink:0">${crafts}× crafts → ${totalProduced}</div>
+      <svg class="expand-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="recipe-body">
+      ${craftsInfoBlock}
+      ${variantTabs}
+      ${ingsHtml}
+      ${productsHtml}
+    </div>
+  </div>`;
+}
+
+function renderIngredients(recipeKey, variant) {
+  const st = recipeState[recipeKey];
+  const rows = variant.Ingredients.map((ing, i) => {
+    const modPct = st.modifiers[i] !== undefined ? st.modifiers[i] : globalModValue;
+    const isStatic = ing.IsStatic;
+    const isTag = !ing.IsSpecificItem;
+    const nameDisplay = isTag
+      ? `<span class="ing-tag">Any ${ing.Tag}</span>`
+      : `<span class="ing-name">${ing.Name}</span>`;
+    const staticBadge = isStatic
+      ? `<span class="ing-static">Fixed</span>`
+      : `<span class="ing-static ing-dynamic">Dynamic</span>`;
+    const modCell = !isStatic ? `
+      <div class="modifier-wrap">
+        <input type="range" min="0" max="100" value="${modPct}"
+          style="--pct:${modPct}%"
+          oninput="setModifier('${recipeKey}',${i},this.value)"
+          onclick="event.stopPropagation()">
+        <span class="modifier-pct" id="mod-${recipeKey}-${i}">${modPct}%</span>
+      </div>` : `<span style="font-size:0.78rem;color:#ccc">—</span>`;
+
+    return `<tr>
+      <td>${nameDisplay}</td>
+      <td style="text-align:center;font-weight:600">${ing.Ammount}</td>
+      <td>${staticBadge}</td>
+      <td class="modifier-cell">${modCell}</td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="ingredients-table">
+    <thead><tr>
+      <th>Ingredient</th>
+      <th style="text-align:center">Qty / craft</th>
+      <th>Type</th>
+      <th>Skill Modifier</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderProducts(variant) {
+  if (!variant.Products || variant.Products.length === 0) return '';
+  const chips = variant.Products.map(p => `<span class="product-chip">×${p.Ammount} ${p.Name}</span>`).join('');
+  return `<div class="products-row"><strong>Produces:</strong> ${chips}</div>`;
+}
+
+// ---- INTERACTIONS ----
+function toggleCard(key) {
+  recipeState[key].expanded = !recipeState[key].expanded;
+  rerenderCard(key);
+}
+
+function toggleSelect(key) {
+  recipeState[key].selected = !recipeState[key].selected;
+  rerenderCard(key);
+  updateShoppingList();
+}
+
+function selectVariant(key, variantKey) {
+  recipeState[key].variantKey = variantKey;
+  recipeState[key].modifiers = {};
+  rerenderCard(key);
+  updateShoppingList();
+}
+
+function setModifier(key, ingIndex, val) {
+  recipeState[key].modifiers[ingIndex] = parseInt(val);
+  const el = document.getElementById(`mod-${key}-${ingIndex}`);
+  if (el) el.textContent = val + '%';
+  // update slider gradient
+  const slider = document.querySelector(`#card-${key} .recipe-body input[type=range]`);
+  // update all sliders in card
+  const sliders = document.querySelectorAll(`#card-${key} .recipe-body input[type=range]`);
+  sliders.forEach(s => { s.style.setProperty('--pct', s.value + '%'); });
+  updateShoppingList();
+}
+
+function rerenderCard(key) {
+  const el = document.getElementById(`card-${key}`);
+  if (!el) return;
+  const recipe = allRecipes.find(r => r.Key === key);
+  if (!recipe) return;
+  el.outerHTML = renderCard(recipe);
+  // re-attach sliders gradient
+  const newEl = document.getElementById(`card-${key}`);
+  if (newEl) {
+    newEl.querySelectorAll('input[type=range]').forEach(s => {
+      s.style.setProperty('--pct', s.value + '%');
+    });
+  }
+}
+
+// ---- PRODUCT → SKILL MAP ----
+// Maps every craftable product name to the primary skill that produces it.
+// If multiple recipes produce the same item, we pick the most specific skill.
+let productSkillMap = {}; // itemName -> skillName (or "Raw / Gathered")
+
+function buildProductSkillMap(allData) {
+  productSkillMap = {};
+  allData.forEach(recipe => {
+    const skill = (recipe.SkillNeeds && recipe.SkillNeeds.length > 0)
+      ? recipe.SkillNeeds[0].Skill
+      : 'No Skill Required';
+    recipe.Variants && recipe.Variants.forEach(variant => {
+      variant.Products && variant.Products.forEach(p => {
+        // Don't overwrite if a more specific (skilled) recipe already set it
+        if (!productSkillMap[p.Name]) {
+          productSkillMap[p.Name] = skill;
+        } else if (productSkillMap[p.Name] === 'No Skill Required' && skill !== 'No Skill Required') {
+          productSkillMap[p.Name] = skill;
+        }
+      });
+    });
+  });
+}
+
+function getIngredientSkill(ingName, isTag) {
+  if (isTag) return 'Raw / Gathered';
+  return productSkillMap[ingName] || 'Raw / Gathered';
+}
+
+// Shared aggregation logic
+function aggregateIngredients() {
+  const selected = allRecipes.filter(r => recipeState[r.Key].selected);
+  const agg = {}; // aggKey -> { name, isTag, total, skill }
+  selected.forEach(recipe => {
+    const st = recipeState[recipe.Key];
+    const qty = craftsNeeded(recipe, globalServings);
+    const variant = recipe.Variants.find(v => v.Key === st.variantKey) || recipe.Variants[0];
+    if (!variant) return;
+    variant.Ingredients.forEach((ing, i) => {
+      const modPct = ing.IsStatic ? 100 :
+        (st.modifiers[i] !== undefined ? st.modifiers[i] : globalModValue);
+      const effectiveQty = ing.Ammount * (modPct / 100) * qty;
+      const aggKey = ing.IsSpecificItem ? `item||${ing.Name}` : `tag||${ing.Tag}`;
+      if (!agg[aggKey]) {
+        const ingName = ing.IsSpecificItem ? ing.Name : ing.Tag;
+        const isTag = !ing.IsSpecificItem;
+        agg[aggKey] = {
+          name: ingName,
+          isTag,
+          total: 0,
+          skill: getIngredientSkill(ingName, isTag)
+        };
+      }
+      agg[aggKey].total += effectiveQty;
+    });
+  });
+  return { selected, items: Object.values(agg) };
+}
+
+// ---- SHOPPING LIST ----
+function updateShoppingList() {
+  const container = document.getElementById('shoppingContent');
+  const { selected, items } = aggregateIngredients();
+
+  if (selected.length === 0) {
+    container.innerHTML = `<div class="shopping-empty"><div class="icon">🧺</div>Select recipes to see your ingredient list</div>`;
+    return;
+  }
+
+  // Group by skill
+  const bySkill = {};
+  items.forEach(item => {
+    if (!bySkill[item.skill]) bySkill[item.skill] = [];
+    bySkill[item.skill].push(item);
+  });
+
+  // Sort skills: alphabetical, Raw/Gathered last, No Skill Required second-to-last
+  const skillOrder = Object.keys(bySkill).sort((a, b) => {
+    if (a === 'Raw / Gathered') return 1;
+    if (b === 'Raw / Gathered') return -1;
+    if (a === 'No Skill Required') return 1;
+    if (b === 'No Skill Required') return -1;
+    return a.localeCompare(b);
+  });
+
+  const skillColors = ['#c8860a','#6b7c5a','#5566aa','#b84c2a','#7a5c8a','#2a7a6a','#8a7a2a','#4a6a8a','#8a4a5a','#5a8a4a'];
+  const skillColorMap = {};
+  skillOrder.filter(s => s !== 'Raw / Gathered' && s !== 'No Skill Required')
+    .forEach((s, i) => { skillColorMap[s] = skillColors[i % skillColors.length]; });
+  skillColorMap['No Skill Required'] = '#999';
+  skillColorMap['Raw / Gathered'] = '#7a8a6a';
+
+  let html = `<div class="selected-summary">${selected.length} recipe${selected.length>1?'s':''} · target ${globalServings} per dish</div>`;
+
+  skillOrder.forEach(skill => {
+    const color = skillColorMap[skill] || '#888';
+    const skillItems = bySkill[skill].sort((a, b) => {
+      if (a.isTag !== b.isTag) return a.isTag ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+    html += `<div class="sl-skill-group">
+      <div class="sl-skill-header" style="--skill-color:${color}">
+        <span class="sl-skill-dot"></span>
+        <span class="sl-skill-name">${skill}</span>
+        <span class="sl-skill-count">${skillItems.length}</span>
+      </div>`;
+    skillItems.forEach(item => {
+      const displayQty = Number.isInteger(item.total) ? item.total : item.total.toFixed(1);
+      html += `<div class="shopping-item">
+        <span class="shopping-item-name ${item.isTag?'is-tag':''}">${item.isTag ? `Any ${item.name}` : item.name}</span>
+        <span class="shopping-item-qty">×${displayQty}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function copyShoppingList() {
+  const { selected, items } = aggregateIngredients();
+  if (selected.length === 0) return;
+
+  const bySkill = {};
+  items.forEach(item => {
+    if (!bySkill[item.skill]) bySkill[item.skill] = [];
+    bySkill[item.skill].push(item);
+  });
+  const skillOrder = Object.keys(bySkill).sort((a, b) => {
+    if (a === 'Raw / Gathered') return 1; if (b === 'Raw / Gathered') return -1;
+    if (a === 'No Skill Required') return 1; if (b === 'No Skill Required') return -1;
+    return a.localeCompare(b);
+  });
+
+  let lines = [`🛒 Dinner Party Shopping List (${globalServings} servings per dish)`, ''];
+  skillOrder.forEach(skill => {
+    lines.push(`── ${skill} ──`);
+    bySkill[skill].sort((a,b) => a.name.localeCompare(b.name)).forEach(i => {
+      const q = Number.isInteger(i.total) ? i.total : i.total.toFixed(1);
+      lines.push(`  ${i.isTag ? `Any ${i.name}` : i.name}: ×${q}`);
+    });
+    lines.push('');
+  });
+  lines.push('Recipes:');
+  selected.forEach(r => {
+    const st = recipeState[r.Key];
+    const variant = r.Variants.find(v => v.Key === st.variantKey) || r.Variants[0];
+    const qty = craftsNeeded(r, globalServings);
+    const perCraft = getPrimaryProductAmt(r, variant);
+    lines.push(`  - ${variant ? variant.Name : r.Key}: ${qty} crafts → ${qty * perCraft} produced`);
+  });
+
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 Copy to Clipboard'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// Init slider gradients on page interaction
+document.addEventListener('input', e => {
+  if (e.target.type === 'range') {
+    e.target.style.setProperty('--pct', e.target.value + '%');
+  }
+});
+
+loadRecipes();
+</script>
+</body>
+</html>

@@ -204,6 +204,16 @@
             color: #007bff;
         }
         
+        .item-available {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+        
+        .row-available {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+        
         .no-offers {
             text-align: center;
             color: #999;
@@ -339,6 +349,34 @@
                 const storesData = await storesResponse.json();
                 if (DEBUG_MODE) console.log('📦 Stores data received:', storesData);
                 
+                // Create a map of available items from ALL stores (selling offers)
+                // Store both total availability and price-filtered availability
+                const marketAvailability = {};
+                const allStores = storesData.Stores || [];
+                
+                allStores.forEach(store => {
+                    const offers = store.AllOffers || [];
+                    offers.forEach(offer => {
+                        // Check for selling offers (Buying = false)
+                        if (offer.Buying === false && offer.Quantity > 0 && offer.Price > 0) {
+                            const itemName = offer.ItemName;
+                            if (!marketAvailability[itemName]) {
+                                marketAvailability[itemName] = {
+                                    total: 0,
+                                    byPrice: []
+                                };
+                            }
+                            marketAvailability[itemName].total += offer.Quantity;
+                            marketAvailability[itemName].byPrice.push({
+                                quantity: offer.Quantity,
+                                price: offer.Price
+                            });
+                        }
+                    });
+                });
+                
+                if (DEBUG_MODE) console.log('🛒 Market availability:', marketAvailability);
+                
                 // Fetch recipes data
                 const recipesResponse = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes');
                 
@@ -472,26 +510,61 @@
                             (a.ItemName || '').localeCompare(b.ItemName || '')
                         );
                         
-                        // Calculate skill volumes for regular items pie chart
+                        // Calculate skill volumes for regular items pie chart (exclude items with market availability)
                         const skillVolumes = {};
                         regularOffers.forEach(offer => {
-                            const fullSkill = itemSkillMap[offer.ItemName] || 'N/A';
-                            // Remove level number from skill
-                            const skillName = fullSkill.replace(/\s+\d+$/, '');
-                            const volume = offer.Price * offer.Quantity;
+                            const itemData = marketAvailability[offer.ItemName];
+                            let inRangeQty = 0;
                             
-                            if (!skillVolumes[skillName]) {
-                                skillVolumes[skillName] = 0;
+                            if (itemData) {
+                                const buyPrice = offer.Price;
+                                const maxPrice = buyPrice * 1.2; // 20% higher
+                                
+                                itemData.byPrice.forEach(sellOffer => {
+                                    // Consider available if price > 0 and <= maxPrice (cheaper or up to 20% more expensive)
+                                    if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                        inRangeQty += sellOffer.quantity;
+                                    }
+                                });
                             }
-                            skillVolumes[skillName] += volume;
+                            
+                            // Only include in chart if NOT enough available on market within price range
+                            if (inRangeQty === 0) {
+                                const fullSkill = itemSkillMap[offer.ItemName] || 'N/A';
+                                // Remove level number from skill
+                                const skillName = fullSkill.replace(/\s+\d+$/, '');
+                                const volume = offer.Price * offer.Quantity;
+                                
+                                if (!skillVolumes[skillName]) {
+                                    skillVolumes[skillName] = 0;
+                                }
+                                skillVolumes[skillName] += volume;
+                            }
                         });
                         
-                        // Calculate volumes for research papers pie chart
+                        // Calculate volumes for research papers pie chart (exclude items with market availability)
                         const paperVolumes = {};
                         researchPapers.forEach(offer => {
-                            const paperName = offer.ItemName;
-                            const volume = offer.Price * offer.Quantity;
-                            paperVolumes[paperName] = volume;
+                            const itemData = marketAvailability[offer.ItemName];
+                            let inRangeQty = 0;
+                            
+                            if (itemData) {
+                                const buyPrice = offer.Price;
+                                const maxPrice = buyPrice * 1.2;
+                                
+                                itemData.byPrice.forEach(sellOffer => {
+                                    if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                        inRangeQty += sellOffer.quantity;
+                                    }
+                                });
+                            }
+                            
+                            // Only include in chart if NOT enough available on market within price range
+                            if (inRangeQty === 0) {
+                                const paperName = offer.ItemName;
+                                const volume = offer.Price * offer.Quantity;
+                                paperVolumes[paperName] = volume;
+                            }
                         });
                         
                         if (DEBUG_MODE) {
@@ -543,18 +616,48 @@
                                                 <th class="sortable" data-column="skill" onclick="sortTable('${tableId}', 'skill', this)">Skill</th>
                                                 <th class="sortable align-right" data-column="price" onclick="sortTable('${tableId}', 'price', this)">Price</th>
                                                 <th class="sortable align-right" data-column="quantity" onclick="sortTable('${tableId}', 'quantity', this)">Quantity</th>
+                                                <th class="sortable align-right" data-column="available" onclick="sortTable('${tableId}', 'available', this)">Available</th>
+                                                <th class="sortable align-right" data-column="expensive" onclick="sortTable('${tableId}', 'expensive', this)">Too Expensive</th>
                                                 <th class="sortable align-right" data-column="volume" onclick="sortTable('${tableId}', 'volume', this)">Volume</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             ${regularOffers.map(offer => {
                                                 const skillName = itemSkillMap[offer.ItemName] || 'N/A';
+                                                const itemData = marketAvailability[offer.ItemName];
+                                                
+                                                let inRangeQty = 0;
+                                                let outOfRangeQty = 0;
+                                                
+                                                if (itemData) {
+                                                    const buyPrice = offer.Price;
+                                                    const maxPrice = buyPrice * 1.2; // 20% higher
+                                                    
+                                                    itemData.byPrice.forEach(sellOffer => {
+                                                        // In range: any price > 0 and <= maxPrice (cheaper or up to 20% more)
+                                                        if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                                            inRangeQty += sellOffer.quantity;
+                                                        } else if (sellOffer.price > maxPrice) {
+                                                            // Too expensive: price > maxPrice
+                                                            outOfRangeQty += sellOffer.quantity;
+                                                        }
+                                                    });
+                                                }
+                                                
+                                                const isAvailable = inRangeQty >= offer.Quantity;
+                                                const rowClass = isAvailable ? 'row-available' : '';
+                                                
+                                                const availableDisplay = inRangeQty > 0 ? `${inRangeQty}` : '-';
+                                                const expensiveDisplay = outOfRangeQty > 0 ? outOfRangeQty : '-';
+                                                
                                                 return `
-                                                <tr>
+                                                <tr class="${rowClass}">
                                                     <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
                                                     <td data-value="${skillName}">${skillName}</td>
                                                     <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
                                                     <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
+                                                    <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
+                                                    <td class="align-right" data-value="${outOfRangeQty}">${expensiveDisplay}</td>
                                                     <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
                                                 </tr>
                                             `}).join('')}
@@ -584,18 +687,47 @@
                                                 <th class="sortable" data-column="item" onclick="sortTable('${papersTableId}', 'item', this)">Research Paper</th>
                                                 <th class="sortable align-right" data-column="price" onclick="sortTable('${papersTableId}', 'price', this)">Price</th>
                                                 <th class="sortable align-right" data-column="quantity" onclick="sortTable('${papersTableId}', 'quantity', this)">Quantity</th>
+                                                <th class="sortable align-right" data-column="available" onclick="sortTable('${papersTableId}', 'available', this)">Available</th>
+                                                <th class="sortable align-right" data-column="expensive" onclick="sortTable('${papersTableId}', 'expensive', this)">Too Expensive</th>
                                                 <th class="sortable align-right" data-column="volume" onclick="sortTable('${papersTableId}', 'volume', this)">Volume</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            ${researchPapers.map(offer => `
-                                                <tr>
+                                            ${researchPapers.map(offer => {
+                                                const itemData = marketAvailability[offer.ItemName];
+                                                
+                                                let inRangeQty = 0;
+                                                let outOfRangeQty = 0;
+                                                
+                                                if (itemData) {
+                                                    const buyPrice = offer.Price;
+                                                    const maxPrice = buyPrice * 1.2;
+                                                    
+                                                    itemData.byPrice.forEach(sellOffer => {
+                                                        if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                                            inRangeQty += sellOffer.quantity;
+                                                        } else if (sellOffer.price > maxPrice) {
+                                                            outOfRangeQty += sellOffer.quantity;
+                                                        }
+                                                    });
+                                                }
+                                                
+                                                const isAvailable = inRangeQty >= offer.Quantity;
+                                                const rowClass = isAvailable ? 'row-available' : '';
+                                                
+                                                const availableDisplay = inRangeQty > 0 ? `${inRangeQty}` : '-';
+                                                const expensiveDisplay = outOfRangeQty > 0 ? outOfRangeQty : '-';
+                                                
+                                                return `
+                                                <tr class="${rowClass}">
                                                     <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
                                                     <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
                                                     <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
+                                                    <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
+                                                    <td class="align-right" data-value="${outOfRangeQty}">${expensiveDisplay}</td>
                                                     <td class="price align-right" data-value="${offer.Price * offer.Quantity}">${(offer.Price * offer.Quantity).toFixed(2)} €</td>
                                                 </tr>
-                                            `).join('')}
+                                            `}).join('')}
                                         </tbody>
                                     </table>
                                 `;
@@ -836,7 +968,9 @@
                 'skill': 2,
                 'price': 3,
                 'quantity': 4,
-                'volume': 5
+                'available': 5,
+                'expensive': 6,
+                'volume': 7
             };
             return columnMap[column];
         }

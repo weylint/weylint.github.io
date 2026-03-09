@@ -529,7 +529,7 @@
                             }
                             
                             // Only include in chart if NOT enough available on market within price range
-                            if (inRangeQty === 0) {
+                            if (inRangeQty < offer.Quantity) {
                                 const fullSkill = itemSkillMap[offer.ItemName] || 'N/A';
                                 // Remove level number from skill
                                 const skillName = fullSkill.replace(/\s+\d+$/, '');
@@ -541,6 +541,34 @@
                                 skillVolumes[skillName] += volume;
                             }
                         });
+                        
+                        // Add research papers to skill volumes as "Modern Paper" category
+                        let modernPaperVolume = 0;
+                        researchPapers.forEach(offer => {
+                            const itemData = marketAvailability[offer.ItemName];
+                            let inRangeQty = 0;
+                            
+                            if (itemData) {
+                                const buyPrice = offer.Price;
+                                const maxPrice = buyPrice * 1.2;
+                                
+                                itemData.byPrice.forEach(sellOffer => {
+                                    if (sellOffer.price > 0 && sellOffer.price <= maxPrice) {
+                                        inRangeQty += sellOffer.quantity;
+                                    }
+                                });
+                            }
+                            
+                            // Only include in chart if NOT enough available on market within price range
+                            if (inRangeQty < offer.Quantity) {
+                                const volume = offer.Price * offer.Quantity;
+                                modernPaperVolume += volume;
+                            }
+                        });
+                        
+                        if (modernPaperVolume > 0) {
+                            skillVolumes['Modern Paper'] = modernPaperVolume;
+                        }
                         
                         // Calculate volumes for research papers pie chart (exclude items with market availability)
                         const paperVolumes = {};
@@ -560,7 +588,7 @@
                             }
                             
                             // Only include in chart if NOT enough available on market within price range
-                            if (inRangeQty === 0) {
+                            if (inRangeQty < offer.Quantity) {
                                 const paperName = offer.ItemName;
                                 const volume = offer.Price * offer.Quantity;
                                 paperVolumes[paperName] = volume;

@@ -764,7 +764,7 @@
 
 <header>
   <h1>🍽 <span>Dinner Party</span> Helper</h1>
-  <p>Eco Game · Cooking Recipe Planner & Ingredient Calculator</p>
+  <p>Eco · Cooking Recipe Planner & Ingredient Calculator</p>
 </header>
 
 <div id="loading">
@@ -1029,7 +1029,7 @@ function getPrimaryProductName(recipe) {
 // ---- FETCH ----
 async function loadRecipes() {
   try {
-    const res = await fetch('http://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes');
+    const res = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     allRecipes = data.Recipes.filter(r => {

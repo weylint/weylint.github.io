@@ -248,6 +248,7 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 0.82rem;
+      table-layout: fixed;
     }
 
     th {
@@ -593,16 +594,27 @@
       wrap.className = 'item-table-wrap';
 
       const table = document.createElement('table');
-      table.innerHTML = `<thead><tr>
-        <th class="ignore-col"></th>
-        <th>Item</th>
-        <th class="num">Buy price</th>
-        <th class="num">Sell price</th>
-        <th class="num">Profit/unit</th>
-        <th class="num">Qty</th>
-        ${hasItemData ? '<th class="num">kg/unit</th><th class="num">Stacks</th>' : ''}
-        <th class="num">Total profit</th>
-      </tr></thead>`;
+      table.innerHTML = `
+        <colgroup>
+          <col style="width:28px">
+          <col>
+          <col style="width:90px">
+          <col style="width:90px">
+          <col style="width:90px">
+          <col style="width:55px">
+          ${hasItemData ? '<col style="width:72px"><col style="width:60px">' : ''}
+          <col style="width:100px">
+        </colgroup>
+        <thead><tr>
+          <th class="ignore-col"></th>
+          <th>Item</th>
+          <th class="num">Buy price</th>
+          <th class="num">Sell price</th>
+          <th class="num">Profit/unit</th>
+          <th class="num">Qty</th>
+          ${hasItemData ? '<th class="num">kg/unit</th><th class="num">Stacks</th>' : ''}
+          <th class="num">Total profit</th>
+        </tr></thead>`;
 
       const tbody = document.createElement('tbody');
       for (const item of route.items) {

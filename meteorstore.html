@@ -303,6 +303,7 @@
     </div>
 
     <script src="white-tiger-api.js"></script>
+    <script src="eco-render.js"></script>
     <script>
         // ============================================
         // DEBUG MODE - Controlled by checkbox
@@ -432,7 +433,7 @@
                     return `
                         <tr>
                             <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
-                            <td data-value="${offer.StoreName}">${offer.StoreName}</td>
+                            <td data-value="${offer.StoreName}">${EcoRender.storeNameHTML(offer.StoreName)}</td>
                             <td data-value="${skillName}">${skillName}</td>
                             <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
                             <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
@@ -468,7 +469,7 @@
                     return `
                         <tr>
                             <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
-                            <td data-value="${offer.StoreName}">${offer.StoreName}</td>
+                            <td data-value="${offer.StoreName}">${EcoRender.storeNameHTML(offer.StoreName)}</td>
                             <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
                             <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>
                             <td class="align-right" data-value="${inRangeQty}">${availableDisplay}</td>
@@ -504,7 +505,7 @@
                     return `
                         <tr class="row-available">
                             <td data-value="${offer.ItemName || 'N/A'}">${offer.ItemName || 'N/A'}</td>
-                            <td data-value="${offer.StoreName}">${offer.StoreName}</td>
+                            <td data-value="${offer.StoreName}">${EcoRender.storeNameHTML(offer.StoreName)}</td>
                             <td data-value="${skillName}">${skillName}</td>
                             <td class="price align-right" data-value="${offer.Price}">${offer.Price.toFixed(2)} €</td>
                             <td class="quantity align-right" data-value="${offer.Quantity}">${offer.Quantity}</td>

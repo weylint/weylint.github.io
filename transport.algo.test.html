@@ -36,8 +36,8 @@
       return div;
     }
 
-    function runCase(name, stores, assertions) {
-      const routes = TransportAlgo.compute(stores);
+    function runCase(name, stores, assertions, itemData, config) {
+      const routes = TransportAlgo.compute(stores, itemData, config);
       const section = document.getElementById('test-cases');
 
       const h2 = document.createElement('h2');
@@ -77,7 +77,19 @@
       return { Buying: true, ItemName: item, Price: price, Quantity: 0, MaxNumWanted: maxNumWanted, MinDurability: minDurability };
     }
 
-    // ── Test cases ─────────────────────────────────────────────────────────────
+    function itemEntry(weightG, maxStackSize, isCarried) {
+      return { weightG, maxStackSize, isCarried };
+    }
+
+    function bigConfig() {
+      return {
+        vehicles: [{ name: 'Truck', slots: 9999, weightG: 999_999_999 }],
+        backpack:  { slots: 9999, weightG: 999_999_999 },
+        hands:     { slots: 1 },
+      };
+    }
+
+    // ── Test cases: existing behaviour ─────────────────────────────────────────
 
     const results = [];
 
@@ -208,6 +220,158 @@
         { label: 'Second route is A→B (profit 50)',        passed: second?.sellStore === 'StoreA' && second?.buyStore === 'StoreB' },
       ];
     }));
+
+    // ── Test cases: capacity allocation ────────────────────────────────────────
+
+    // 11. IsCarried item: hands slot used first, capped at maxStackSize
+    results.push(runCase('11. Hands slot: IsCarried item capped at maxStackSize', [
+      store('StoreA', true, 'Euro', 9999, [sellOffer('Sword', 5, 50)]),
+      store('StoreB', true, 'Euro', 9999, [buyOffer ('Sword', 10, 50)]),
+    ], routes => {
+      const it = routes[0]?.items[0];
+      return [
+        { label: 'Route found',                          passed: routes.length >= 1 },
+        { label: 'handsQty = 10 (one stack, maxStack=10)', passed: it?.handsQty === 10 },
+        { label: 'vehicleQty = 0 (no vehicle slots)',    passed: it?.vehicleQty === 0 },
+        { label: 'qty = 10',                             passed: it?.qty === 10 },
+      ];
+    },
+    { Sword: itemEntry(500, 10, true) },
+    {
+      vehicles: [],                                      // no vehicle
+      backpack:  { slots: 0,  weightG: 0 },             // no backpack (IsCarried items skip it)
+      hands:     { slots: 1 },
+    }));
+
+    // 12. Backpack weight cap reduces qty for !isCarried item
+    results.push(runCase('12. Backpack weight cap', [
+      store('StoreA', true, 'Euro', 9999, [sellOffer('Stone', 5, 50)]),
+      store('StoreB', true, 'Euro', 9999, [buyOffer ('Stone', 10, 50)]),
+    ], routes => {
+      const it = routes[0]?.items[0];
+      // backpack: 3000g limit, Stone = 1000g → fits 3 units (1 stack of 3)
+      return [
+        { label: 'Route found',                          passed: routes.length >= 1 },
+        { label: 'backpackQty = 3 (3000g / 1000g)',     passed: it?.backpackQty === 3 },
+        { label: 'vehicleQty = 0 (no vehicle)',          passed: it?.vehicleQty === 0 },
+        { label: 'qty = 3',                              passed: it?.qty === 3 },
+      ];
+    },
+    { Stone: itemEntry(1000, 20, false) },
+    {
+      vehicles: [],
+      backpack:  { slots: 16, weightG: 3000 },
+      hands:     { slots: 1 },
+    }));
+
+    // 13. Vehicle slot cap reduces qty
+    results.push(runCase('13. Vehicle slot cap', [
+      store('StoreA', true, 'Euro', 9999, [sellOffer('Plank', 5, 100)]),
+      store('StoreB', true, 'Euro', 9999, [buyOffer ('Plank', 10, 100)]),
+    ], routes => {
+      const it = routes[0]?.items[0];
+      // vehicle: 3 slots, maxStackSize=20 → 3*20=60 units max
+      return [
+        { label: 'Route found',                          passed: routes.length >= 1 },
+        { label: 'vehicleQty = 60 (3 slots × 20)',      passed: it?.vehicleQty === 60 },
+        { label: 'qty = 60',                             passed: it?.qty === 60 },
+      ];
+    },
+    { Plank: itemEntry(200, 20, false) },
+    {
+      vehicles: [{ name: 'Truck', slots: 3, weightG: 999_999_999 }],
+      backpack:  { slots: 0, weightG: 0 },
+      hands:     { slots: 0 },
+    }));
+
+    // 14. Weight-0 item: slot-only constraint, no weight budget consumed
+    results.push(runCase('14. Weight-0 item: slot-only constraint', [
+      store('StoreA', true, 'Euro', 9999, [sellOffer('Feather', 1, 500)]),
+      store('StoreB', true, 'Euro', 9999, [buyOffer ('Feather', 2, 500)]),
+    ], routes => {
+      const it = routes[0]?.items[0];
+      // backpack: 1 slot, weightG=0 (weightless item) → 1*100=100 units
+      // vehicle: 2 slots → 2*100=200 units; total = 300
+      return [
+        { label: 'Route found',                          passed: routes.length >= 1 },
+        { label: 'backpackQty = 100 (1 slot × 100)',    passed: it?.backpackQty === 100 },
+        { label: 'vehicleQty = 200 (2 slots × 100)',    passed: it?.vehicleQty === 200 },
+        { label: 'qty = 300',                            passed: it?.qty === 300 },
+      ];
+    },
+    { Feather: itemEntry(0, 100, false) },
+    {
+      vehicles: [{ name: 'Truck', slots: 2, weightG: 0 }],
+      backpack:  { slots: 1, weightG: 0 },
+      hands:     { slots: 0 },
+    }));
+
+    // 15. Low-weight item preferred over high-profit item for backpack slot
+    results.push(runCase('15. Backpack prefers low-weight items', [
+      // LightItem: profit/unit=3 (lower), weight=100g   — should fill the backpack
+      // HeavyItem: profit/unit=10 (higher), weight=400g — too heavy for remaining backpack weight
+      store('StoreA', true, 'Euro', 9999, [sellOffer('LightItem', 1, 5), sellOffer('HeavyItem', 2, 5)]),
+      store('StoreB', true, 'Euro', 9999, [buyOffer ('LightItem', 4, 5), buyOffer ('HeavyItem', 12, 5)]),
+    ], routes => {
+      const route = routes[0];
+      const light = route?.items.find(i => i.itemName === 'LightItem');
+      const heavy = route?.items.find(i => i.itemName === 'HeavyItem');
+      // Backpack: 2 slots, 600g limit
+      // LightItem: 5 units × 100g = 500g → fits (1 stack of 5)
+      // HeavyItem: 600-500=100g left, 100/400=0 → 0 fit in backpack
+      // No vehicle → HeavyItem.qty = 0
+      return [
+        { label: 'Route found',                              passed: routes.length >= 1 },
+        { label: 'LightItem.backpackQty = 5',               passed: light?.backpackQty === 5 },
+        { label: 'HeavyItem.backpackQty = 0 (no room left)',passed: heavy?.backpackQty === 0 },
+        { label: 'LightItem.qty = 5',                       passed: light?.qty === 5 },
+        { label: 'HeavyItem.qty = 0 (no vehicle)',          passed: heavy?.qty === 0 },
+      ];
+    },
+    {
+      LightItem: itemEntry(100, 10, false),
+      HeavyItem: itemEntry(400, 10, false),
+    },
+    {
+      vehicles: [],
+      backpack:  { slots: 2, weightG: 600 },
+      hands:     { slots: 0 },
+    }));
+
+    // 16. Multiple vehicles: capacities are summed
+    results.push(runCase('16. Multiple vehicles: capacities summed', [
+      store('StoreA', true, 'Euro', 9999, [sellOffer('Iron', 5, 100)]),
+      store('StoreB', true, 'Euro', 9999, [buyOffer ('Iron', 10, 100)]),
+    ], routes => {
+      const it = routes[0]?.items[0];
+      // Two vehicles: 3 slots each = 6 slots total; maxStackSize=10 → 60 units
+      return [
+        { label: 'Route found',                          passed: routes.length >= 1 },
+        { label: 'vehicleQty = 60 (2×3 slots × 10)',    passed: it?.vehicleQty === 60 },
+        { label: 'qty = 60',                             passed: it?.qty === 60 },
+      ];
+    },
+    { Iron: itemEntry(500, 10, false) },
+    {
+      vehicles: [
+        { name: 'Truck 1', slots: 3, weightG: 999_999_999 },
+        { name: 'Truck 2', slots: 3, weightG: 999_999_999 },
+      ],
+      backpack: { slots: 0, weightG: 0 },
+      hands:    { slots: 0 },
+    }));
+
+    // 17. Empty itemData: quantities unchanged (graceful fallback)
+    results.push(runCase('17. Empty itemData: quantities unchanged', [
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood', 5, 10)]),
+      store('StoreB', true, 'Euro', 1000, [buyOffer('Wood', 10, 10)]),
+    ], routes => [
+      { label: 'Route found',              passed: routes.length >= 1 },
+      { label: 'qty unchanged at 10',      passed: routes[0]?.items[0]?.qty === 10 },
+      { label: 'totalProfit = 50',         passed: routes[0]?.totalProfit === 50 },
+    ],
+    {},   // empty itemData → applyCapacity = false
+    bigConfig()));
 
     // ── Summary ────────────────────────────────────────────────────────────────
 

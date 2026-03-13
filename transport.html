@@ -52,14 +52,14 @@
 
     #count-label { color: #8b949e; font-size: 0.8rem; }
 
-    /* ── Ignored orders section ── */
-    #ignored-section {
+    /* ── Collapsible sections in header ── */
+    .header-section {
       margin-top: 14px;
       border-top: 1px solid #21262d;
       padding-top: 12px;
     }
 
-    #ignored-section summary {
+    .header-section > summary {
       cursor: pointer;
       color: #8b949e;
       font-size: 0.8rem;
@@ -67,9 +67,83 @@
       user-select: none;
     }
 
-    #ignored-section summary::-webkit-details-marker { display: none; }
-    #ignored-section summary:hover { color: #c9d1d9; }
+    .header-section > summary::-webkit-details-marker { display: none; }
+    .header-section > summary:hover { color: #c9d1d9; }
 
+    /* ── Transport config panel ── */
+    .config-body {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .config-group {
+      display: flex;
+      gap: 12px;
+      font-size: 0.8rem;
+      align-items: flex-start;
+    }
+
+    .config-label {
+      color: #6e7681;
+      min-width: 70px;
+      padding-top: 4px;
+      flex-shrink: 0;
+    }
+
+    .config-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .config-info { color: #6e7681; padding-top: 4px; }
+
+    .vehicle-row, .config-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #8b949e;
+    }
+
+    input[type="text"], input[type="number"] {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 3px 7px;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus {
+      outline: 2px solid #58a6ff;
+      outline-offset: 1px;
+    }
+
+    .v-name   { width: 90px; }
+    .v-weight { width: 65px; text-align: right; }
+    .v-slots  { width: 50px; text-align: right; }
+    .bp-weight { width: 65px; text-align: right; }
+    .bp-slots  { width: 50px; text-align: right; }
+
+    .add-vehicle-btn, .remove-vehicle-btn {
+      background: none;
+      border: 1px solid #30363d;
+      border-radius: 3px;
+      color: #8b949e;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 2px 7px;
+      line-height: 1.5;
+    }
+
+    .add-vehicle-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+    .remove-vehicle-btn:hover { border-color: #f85149; color: #f85149; }
+
+    /* ── Ignored orders section ── */
     #ignored-list {
       margin-top: 10px;
       display: flex;
@@ -156,6 +230,14 @@
 
     details[open] .collapse-icon { transform: rotate(90deg); }
 
+    /* ── Capacity summary bar ── */
+    .route-capacity {
+      padding: 4px 16px;
+      font-size: 0.76rem;
+      color: #6e7681;
+      background: #0d1117;
+    }
+
     /* ── Item table ── */
     .item-table-wrap {
       overflow-x: auto;
@@ -241,13 +323,39 @@
       <span id="count-label"></span>
     </div>
 
-    <details id="ignored-section" style="display:none">
+    <details id="config-section" class="header-section">
+      <summary>&#9881; Transport settings</summary>
+      <div class="config-body">
+        <div class="config-group">
+          <span class="config-label">Vehicles</span>
+          <div class="config-controls">
+            <div id="vehicle-list"></div>
+            <button id="add-vehicle-btn" class="add-vehicle-btn">+ Add vehicle</button>
+          </div>
+        </div>
+        <div class="config-group">
+          <span class="config-label">Backpack</span>
+          <div class="config-inline">
+            <input type="number" id="backpack-weight" class="bp-weight" value="25" min="0" step="1" title="Backpack weight limit (kg)">
+            <span>kg</span>
+            <input type="number" id="backpack-slots" class="bp-slots" value="16" min="0" step="1" title="Backpack slot count">
+            <span>slots</span>
+          </div>
+        </div>
+        <div class="config-group">
+          <span class="config-label">Hands</span>
+          <span class="config-info">1 slot &middot; no weight limit &middot; IsCarried items only</span>
+        </div>
+      </div>
+    </details>
+
+    <details id="ignored-section" class="header-section" style="display:none">
       <summary id="ignored-summary">Ignored buy orders (0)</summary>
       <div id="ignored-list"></div>
     </details>
   </header>
 
-  <div id="status">Loading store data…</div>
+  <div id="status">Loading store data&hellip;</div>
   <div id="routes-container"></div>
 </div>
 
@@ -257,13 +365,81 @@
 <script>
   const esc = EcoRender.esc;
 
-  const statusEl      = document.getElementById('status');
-  const routesEl      = document.getElementById('routes-container');
-  const topNSelect    = document.getElementById('topN');
-  const countLabel    = document.getElementById('count-label');
+  const statusEl       = document.getElementById('status');
+  const routesEl       = document.getElementById('routes-container');
+  const topNSelect     = document.getElementById('topN');
+  const countLabel     = document.getElementById('count-label');
   const ignoredSection = document.getElementById('ignored-section');
   const ignoredSummary = document.getElementById('ignored-summary');
   const ignoredListEl  = document.getElementById('ignored-list');
+  const configSection  = document.getElementById('config-section');
+  const vehicleListEl  = document.getElementById('vehicle-list');
+
+  // ── Transport config ───────────────────────────────────────────────────────
+
+  let itemData = {};
+
+  let transportConfig = {
+    vehicles: [{ name: 'Truck', slots: 36, weightG: 8_000_000 }],
+    backpack:  { slots: 16, weightG: 25_000 },
+    hands:     { slots: 1 },
+  };
+
+  function renderConfig() {
+    vehicleListEl.innerHTML = '';
+    transportConfig.vehicles.forEach((v, i) => {
+      const row = document.createElement('div');
+      row.className = 'vehicle-row';
+      row.dataset.idx = i;
+      row.innerHTML = `
+        <input type="text"   class="v-name"   value="${esc(v.name)}" placeholder="Name">
+        <input type="number" class="v-weight" value="${v.weightG / 1000}" min="0" step="100" title="Weight limit (kg)">
+        <span>kg</span>
+        <input type="number" class="v-slots"  value="${v.slots}" min="0" step="1" title="Slot count">
+        <span>slots</span>
+        <button class="remove-vehicle-btn" title="Remove vehicle">&times;</button>
+      `;
+      vehicleListEl.appendChild(row);
+    });
+  }
+
+  configSection.addEventListener('change', e => {
+    const row = e.target.closest('.vehicle-row');
+    if (row) {
+      const idx = parseInt(row.dataset.idx, 10);
+      if (e.target.classList.contains('v-name'))
+        transportConfig.vehicles[idx].name = e.target.value;
+      if (e.target.classList.contains('v-weight'))
+        transportConfig.vehicles[idx].weightG = (parseFloat(e.target.value) || 0) * 1000;
+      if (e.target.classList.contains('v-slots'))
+        transportConfig.vehicles[idx].slots = parseInt(e.target.value, 10) || 0;
+      recompute();
+      return;
+    }
+    if (e.target.id === 'backpack-weight') {
+      transportConfig.backpack.weightG = (parseFloat(e.target.value) || 0) * 1000;
+      recompute();
+    }
+    if (e.target.id === 'backpack-slots') {
+      transportConfig.backpack.slots = parseInt(e.target.value, 10) || 0;
+      recompute();
+    }
+  });
+
+  configSection.addEventListener('click', e => {
+    if (e.target.classList.contains('remove-vehicle-btn')) {
+      const row = e.target.closest('.vehicle-row');
+      transportConfig.vehicles.splice(parseInt(row.dataset.idx, 10), 1);
+      renderConfig();
+      recompute();
+      return;
+    }
+    if (e.target.id === 'add-vehicle-btn') {
+      transportConfig.vehicles.push({ name: '', slots: 36, weightG: 8_000_000 });
+      renderConfig();
+      recompute();
+    }
+  });
 
   // ── Ignored buy orders ────────────────────────────────────────────────────
   // A buy order is identified by "storeName|||itemName|||price".
@@ -294,7 +470,7 @@
   }
 
   function recompute() {
-    allRoutes = TransportAlgo.compute(filterStores(rawStores));
+    allRoutes = TransportAlgo.compute(filterStores(rawStores), itemData, transportConfig);
     renderRoutes();
     renderIgnored();
   }
@@ -336,13 +512,16 @@
   // ── Formatting ────────────────────────────────────────────────────────────
 
   function fmt(n) {
-    return '€\u202f' + n.toFixed(2);
+    return '\u20ac\u202f' + n.toFixed(2);
   }
 
   // ── Route rendering ───────────────────────────────────────────────────────
 
   function renderRoutes() {
     routesEl.innerHTML = '';
+
+    const hasItemData = Object.keys(itemData).length > 0;
+    const totalVehicleSlots = transportConfig.vehicles.reduce((s, v) => s + v.slots, 0);
 
     const topN   = parseInt(topNSelect.value, 10);
     const total  = allRoutes.length;
@@ -361,16 +540,55 @@
       summary.innerHTML = `
         <span class="route-title">
           Buy from: <span class="route-store">${EcoRender.storeNameHTML(route.sellStore)}</span>
-          <span class="arrow">→</span>
+          <span class="arrow">&rarr;</span>
           Sell to: <span class="route-store">${EcoRender.storeNameHTML(route.buyStore)}</span>
         </span>
         <span class="route-profit${profitIsZero ? ' zero' : ''}">
           ${profitIsZero ? 'break-even' : fmt(route.totalProfit) + ' profit'}
         </span>
-        <span class="collapse-icon">▶</span>
+        <span class="collapse-icon">&#9654;</span>
       `;
       details.appendChild(summary);
 
+      // ── Capacity summary bar ────────────────────────────────────────────
+      if (hasItemData) {
+        const totalWeightG = route.items.reduce((sum, it) => {
+          const d = itemData[it.itemName];
+          return sum + (d ? it.qty * d.weightG : 0);
+        }, 0);
+
+        const vehicleSlotsUsed = route.items.reduce((sum, it) => {
+          const d = itemData[it.itemName];
+          return sum + (d && it.vehicleQty > 0 ? Math.ceil(it.vehicleQty / d.maxStackSize) : 0);
+        }, 0);
+
+        const backpackSlotsUsed = route.items.reduce((sum, it) => {
+          const d = itemData[it.itemName];
+          return sum + (d && it.backpackQty > 0 ? Math.ceil(it.backpackQty / d.maxStackSize) : 0);
+        }, 0);
+
+        const handsUsed = route.items.reduce((sum, it) => sum + (it.handsQty > 0 ? 1 : 0), 0);
+
+        const kg = totalWeightG / 1000;
+        const weightStr = kg >= 1000
+          ? (kg / 1000).toFixed(2) + ' t'
+          : kg.toFixed(1) + ' kg';
+
+        const parts = ['\u2696 ' + weightStr];
+        if (totalVehicleSlots > 0)
+          parts.push(`Vehicle ${vehicleSlotsUsed}/${totalVehicleSlots} slots`);
+        if (transportConfig.backpack.slots > 0)
+          parts.push(`Backpack ${backpackSlotsUsed}/${transportConfig.backpack.slots} slots`);
+        if (handsUsed > 0)
+          parts.push(`Hands ${handsUsed}/1`);
+
+        const capDiv = document.createElement('div');
+        capDiv.className = 'route-capacity';
+        capDiv.textContent = parts.join('  \u00b7  ');
+        details.appendChild(capDiv);
+      }
+
+      // ── Item table ──────────────────────────────────────────────────────
       const wrap  = document.createElement('div');
       wrap.className = 'item-table-wrap';
 
@@ -381,7 +599,8 @@
         <th class="num">Buy price</th>
         <th class="num">Sell price</th>
         <th class="num">Profit/unit</th>
-        <th class="num">Max qty</th>
+        <th class="num">Qty</th>
+        ${hasItemData ? '<th class="num">kg/unit</th><th class="num">Stacks</th>' : ''}
         <th class="num">Total profit</th>
       </tr></thead>`;
 
@@ -389,17 +608,23 @@
       for (const item of route.items) {
         const breakEven = item.profitPerUnit === 0;
         const key = ignoredKey(route.buyStore, item.itemName, item.buyPrice);
+        const d   = itemData[item.itemName];
+
+        const kgPerUnit = d && d.weightG > 0 ? (d.weightG / 1000).toFixed(3) : '';
+        const stacks    = d && item.qty > 0  ? Math.ceil(item.qty / Math.max(1, d.maxStackSize)) : '';
+
         const tr = document.createElement('tr');
         if (breakEven) tr.className = 'break-even';
         tr.innerHTML = `
           <td class="ignore-col">
-            <button class="ignore-btn" data-key="${esc(key)}" title="Ignore this buy order everywhere">✕</button>
+            <button class="ignore-btn" data-key="${esc(key)}" title="Ignore this buy order everywhere">&times;</button>
           </td>
           <td>${esc(item.itemName)}${breakEven ? '<span class="break-even-badge">break-even</span>' : ''}</td>
           <td class="num">${fmt(item.sellPrice)}</td>
           <td class="num">${fmt(item.buyPrice)}</td>
           <td class="num ${breakEven ? 'profit-zero' : 'profit-val'}">${fmt(item.profitPerUnit)}</td>
           <td class="num">${item.qty}</td>
+          ${hasItemData ? `<td class="num">${esc(String(kgPerUnit))}</td><td class="num">${esc(String(stacks))}</td>` : ''}
           <td class="num ${breakEven ? 'profit-zero' : 'profit-val'}">${fmt(item.totalProfit)}</td>
         `;
         tbody.appendChild(tr);
@@ -430,9 +655,26 @@
 
   async function init() {
     try {
-      const data = await WhiteTigerAPI.fetchStores();
-      rawStores = Array.isArray(data?.Stores) ? data.Stores : [];
-      allRoutes = TransportAlgo.compute(filterStores(rawStores));
+      const [storesData, itemsData] = await Promise.all([
+        WhiteTigerAPI.fetchStores(),
+        WhiteTigerAPI.fetchAllItems().catch(() => null),
+      ]);
+
+      rawStores = Array.isArray(storesData?.Stores) ? storesData.Stores : [];
+
+      if (itemsData?.AllItems) {
+        for (const [name, item] of Object.entries(itemsData.AllItems)) {
+          const p = item.PropertyInfos;
+          itemData[name] = {
+            weightG:      parseInt(p.Weight?.Int32      ?? 0),
+            maxStackSize: parseInt(p.MaxStackSize?.Int32 ?? 1),
+            isCarried:    p.IsCarried?.Boolean === 'True',
+          };
+        }
+      }
+
+      renderConfig();
+      allRoutes = TransportAlgo.compute(filterStores(rawStores), itemData, transportConfig);
       statusEl.style.display = 'none';
       renderRoutes();
       renderIgnored();

@@ -302,6 +302,7 @@
         <div id="stores"></div>
     </div>
 
+    <script src="white-tiger-api.js"></script>
     <script>
         // ============================================
         // DEBUG MODE - Controlled by checkbox
@@ -338,15 +339,7 @@
                 if (DEBUG_MODE) console.log('🔍 Starting data fetch...');
                 
                 // Fetch stores data
-                const storesResponse = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/stores');
-                
-                if (DEBUG_MODE) console.log('📡 Stores Response Status:', storesResponse.status);
-                
-                if (!storesResponse.ok) {
-                    throw new Error(`HTTP Error (Stores): ${storesResponse.status}`);
-                }
-                
-                const storesData = await storesResponse.json();
+                const storesData = await WhiteTigerAPI.fetchStores();
                 if (DEBUG_MODE) console.log('📦 Stores data received:', storesData);
                 
                 // Create a map of available items from ALL stores (selling offers)
@@ -378,15 +371,7 @@
                 if (DEBUG_MODE) console.log('🛒 Market availability:', marketAvailability);
                 
                 // Fetch recipes data
-                const recipesResponse = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes');
-                
-                if (DEBUG_MODE) console.log('📡 Recipes Response Status:', recipesResponse.status);
-                
-                if (!recipesResponse.ok) {
-                    throw new Error(`HTTP Error (Recipes): ${recipesResponse.status}`);
-                }
-                
-                const recipesData = await recipesResponse.json();
+                const recipesData = await WhiteTigerAPI.fetchRecipes();
                 if (DEBUG_MODE) console.log('📦 Recipes data received:', recipesData);
                 
                 // Create a map of item name to skill name + level

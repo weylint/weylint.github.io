@@ -873,6 +873,7 @@
   </div>
 </div>
 
+<script src="white-tiger-api.js"></script>
 <script>
 // Skills shown in tabs - Advanced Cooking split into Stove/Kitchen, Campfire Cooking split into Salads/Stews
 const COOKING_SKILLS = [
@@ -1029,9 +1030,7 @@ function getPrimaryProductName(recipe) {
 // ---- FETCH ----
 async function loadRecipes() {
   try {
-    const res = await fetch('https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await WhiteTigerAPI.fetchRecipes();
     allRecipes = data.Recipes.filter(r => {
       if (!r.SkillNeeds || r.SkillNeeds.length === 0) return false;
       if (EXCLUDED_TABLES.has(r.CraftingTable)) return false;

@@ -11,274 +11,297 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
             min-height: 100vh;
             padding: 20px;
         }
-        
+
         .container {
-            max-width: 1200px;
             margin: 0 auto;
         }
-        
+
         header {
-            background: white;
-            border-radius: 10px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
         .header-controls {
             display: flex;
             align-items: center;
             gap: 15px;
             margin-top: 10px;
         }
-        
+
         .debug-toggle {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 14px;
-            color: #666;
+            font-size: 0.875rem;
+            color: #8b949e;
         }
-        
+
         .debug-toggle input[type="checkbox"] {
             cursor: pointer;
             width: 18px;
             height: 18px;
         }
-        
-        h1 {
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-        
+
         .loading {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px 20px;
+            color: #8b949e;
             text-align: center;
-            color: white;
-            font-size: 18px;
-            padding: 40px;
         }
-        
+
         .error {
-            background: #ff6b6b;
-            color: white;
-            padding: 15px;
+            border: 1px solid #6e3030;
             border-radius: 8px;
+            color: #f85149;
+            padding: 16px 20px;
             margin-bottom: 20px;
         }
-        
+
         .store-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        
-        .chart-container {
-            margin: 20px 0;
-            padding: 20px;
-            background: #f8f9fa;
+            background: #161b22;
+            border: 1px solid #30363d;
             border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 12px;
         }
-        
+
+        .chart-container {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .chart-container h3 {
+            color: #8b949e;
+            font-size: 0.875rem;
+            font-weight: normal;
+            margin-bottom: 12px;
+        }
+
         .charts-wrapper {
             display: flex;
             gap: 20px;
             flex-wrap: wrap;
             justify-content: center;
         }
-        
+
         .chart-box {
             flex: 1;
             min-width: 300px;
             max-width: 500px;
             text-align: center;
         }
-        
+
         .chart-container canvas {
             max-width: 100%;
             max-height: 400px;
             margin: 0 auto;
         }
-        
+
         .papers-summary {
-            background: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 5px;
+            background: #0d1117;
+            border-left: 3px solid #58a6ff;
+            padding: 12px 16px;
+            margin: 12px 0;
+            border-radius: 0 4px 4px 0;
         }
-        
+
         .papers-summary h4 {
-            color: #1976d2;
-            margin-bottom: 10px;
+            color: #58a6ff;
+            font-size: 0.875rem;
+            margin-bottom: 6px;
         }
-        
+
         .papers-summary p {
-            margin: 5px 0;
-            color: #333;
+            margin: 3px 0;
+            color: #8b949e;
+            font-size: 0.82rem;
         }
-        
+
         .store-header {
-            border-bottom: 2px solid #667eea;
+            border-bottom: 1px solid #30363d;
             padding-bottom: 10px;
             margin-bottom: 15px;
         }
-        
+
         .store-name {
-            color: #667eea;
-            font-size: 24px;
+            color: #58a6ff;
+            font-size: 1.1rem;
             font-weight: bold;
         }
-        
+
         .store-owner {
-            color: #666;
-            font-size: 14px;
+            color: #8b949e;
+            font-size: 0.875rem;
             margin-top: 5px;
         }
-        
+
         .offers-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
         }
-        
+
         .offers-table th {
-            background: #f8f9fa;
-            padding: 12px;
+            background: #0d1117;
+            padding: 7px 12px;
             text-align: left;
-            font-weight: 600;
-            color: #333;
-            border-bottom: 2px solid #dee2e6;
+            font-weight: normal;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
             cursor: pointer;
             user-select: none;
+            white-space: nowrap;
             transition: background 0.2s;
         }
-        
+
         .offers-table th:hover {
-            background: #e9ecef;
+            background: #1c2128;
         }
-        
+
         .offers-table th.sortable::after {
             content: ' ⇅';
-            opacity: 0.3;
+            opacity: 0.4;
         }
-        
+
         .offers-table th.sorted-asc::after {
             content: ' ▲';
             opacity: 1;
         }
-        
+
         .offers-table th.sorted-desc::after {
             content: ' ▼';
             opacity: 1;
         }
-        
+
         .offers-table th.align-right,
         .offers-table td.align-right {
             text-align: right;
         }
-        
+
         .offers-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #dee2e6;
+            padding: 6px 12px;
+            border-top: 1px solid #21262d;
+            white-space: nowrap;
+            color: #c9d1d9;
         }
-        
-        .offers-table tr:hover {
-            background: #f8f9fa;
+
+        .offers-table tr:hover td {
+            background: #1c2128;
         }
-        
+
         .price {
-            color: #28a745;
-            font-weight: bold;
+            color: #3fb950;
         }
-        
+
         .quantity {
-            color: #007bff;
+            color: #8b949e;
         }
-        
+
         .item-available {
             text-decoration: line-through;
-            opacity: 0.6;
+            opacity: 0.45;
         }
-        
+
         .row-available {
             text-decoration: line-through;
-            opacity: 0.6;
+            opacity: 0.45;
         }
-        
+
         .no-offers {
             text-align: center;
-            color: #999;
+            color: #6e7681;
             padding: 20px;
-            font-style: italic;
         }
-        
+
         .refresh-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            background: none;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            border-radius: 4px;
+            padding: 4px 12px;
             cursor: pointer;
-            font-size: 16px;
-            transition: background 0.3s;
+            font-family: inherit;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, color 0.2s;
         }
-        
+
         .refresh-btn:hover {
-            background: #5568d3;
+            border-color: #58a6ff;
+            color: #58a6ff;
         }
-        
+
         .copy-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
+            background: none;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            border-radius: 4px;
+            padding: 4px 12px;
             cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s;
+            font-family: inherit;
+            font-size: 0.875rem;
             margin-left: 10px;
+            transition: border-color 0.2s, color 0.2s;
         }
-        
+
         .copy-btn:hover {
-            background: #218838;
+            border-color: #3fb950;
+            color: #3fb950;
         }
-        
+
         .copy-btn.copied {
-            background: #6c757d;
+            color: #6e7681;
+            border-color: #6e7681;
         }
-        
+
         .last-update {
-            color: #666;
-            font-size: 14px;
-            margin-top: 10px;
+            color: #8b949e;
+            font-size: 0.8rem;
+            margin-top: 8px;
         }
-        
+
         .debug-info {
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-            padding: 15px;
+            background: #0d1117;
+            border-left: 3px solid #30363d;
+            padding: 12px 16px;
             margin-top: 10px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 13px;
+            border-radius: 0 4px 4px 0;
+            font-family: inherit;
+            font-size: 0.82rem;
+            color: #8b949e;
         }
-        
+
         .debug-info div {
             margin: 5px 0;
         }
-        
+
         .debug-label {
-            font-weight: bold;
-            color: #667eea;
+            color: #58a6ff;
         }
     </style>
 </head>
@@ -286,6 +309,7 @@
     <div class="container">
         <header>
             <h1>🌠 Meteor Store - Buying Offers</h1>
+            <p>Consolidated buying offers across all Meteor Stores.</p>
             <div class="header-controls">
                 <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
                 <label class="debug-toggle">

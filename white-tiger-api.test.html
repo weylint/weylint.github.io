@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>white-tiger-api.js Tests</title>
+  <style>
+    body { font-family: monospace; background: #1a1a1a; color: #ccc; padding: 2rem; max-width: 900px; margin: 0 auto; }
+    h1 { color: #fff; margin-bottom: 0.25rem; }
+    h2 { color: #aaa; font-size: 1rem; margin: 1.5rem 0 0.5rem; border-bottom: 1px solid #333; padding-bottom: 0.25rem; }
+    .check { margin: 0.2rem 0; }
+    .pass { color: #4caf50; }
+    .fail { color: #f44336; }
+    .pending { color: #888; }
+    details { margin-top: 0.75rem; }
+    summary { cursor: pointer; color: #888; font-size: 0.85rem; }
+    summary:hover { color: #ccc; }
+    pre { background: #111; border: 1px solid #333; padding: 0.75rem; overflow: auto; font-size: 0.8rem; color: #9cdcfe; margin: 0.5rem 0 0; max-height: 300px; }
+    .status { font-size: 0.85rem; color: #888; margin-top: 0.25rem; }
+    .error { color: #f44336; font-size: 0.85rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>white-tiger-api.js</h1>
+  <p class="status">Running tests against the live server...</p>
+
+  <div id="recipes-section">
+    <h2>fetchRecipes()</h2>
+    <div id="recipes-checks"><span class="pending">loading...</span></div>
+  </div>
+
+  <div id="stores-section">
+    <h2>fetchStores()</h2>
+    <div id="stores-checks"><span class="pending">loading...</span></div>
+  </div>
+
+  <script src="white-tiger-api.js"></script>
+  <script>
+    function check(label, passed) {
+      const span = document.createElement('div');
+      span.className = 'check';
+      span.innerHTML = `<span class="${passed ? 'pass' : 'fail'}">${passed ? '✓' : '✗'}</span> ${label}`;
+      return span;
+    }
+
+    function renderChecks(containerId, checks, data, errorMsg) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if (errorMsg) {
+        const err = document.createElement('div');
+        err.className = 'error';
+        err.textContent = '✗ ' + errorMsg;
+        container.appendChild(err);
+        return;
+      }
+      checks.forEach(c => container.appendChild(check(c.label, c.passed)));
+      if (data !== null) {
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = 'raw sample (first item)';
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(data, null, 2);
+        details.appendChild(summary);
+        details.appendChild(pre);
+        container.appendChild(details);
+      }
+    }
+
+    async function runTests() {
+      const [recipesResult, storesResult] = await Promise.allSettled([
+        WhiteTigerAPI.fetchRecipes(),
+        WhiteTigerAPI.fetchStores(),
+      ]);
+
+      // --- fetchRecipes ---
+      if (recipesResult.status === 'rejected') {
+        renderChecks('recipes-checks', [], null, recipesResult.reason.message);
+      } else {
+        const data = recipesResult.value;
+        const recipes = Array.isArray(data?.Recipes) ? data.Recipes : [];
+        const first = recipes[0] ?? null;
+        renderChecks('recipes-checks', [
+          { label: 'HTTP call succeeded',                        passed: true },
+          { label: 'Response has a Recipes array',              passed: Array.isArray(data?.Recipes) },
+          { label: 'At least one recipe present',               passed: recipes.length > 0 },
+          { label: 'First recipe has Key',                      passed: first != null && 'Key' in first },
+          { label: 'First recipe has SkillNeeds',               passed: first != null && 'SkillNeeds' in first },
+          { label: 'First recipe has Variants',                 passed: first != null && 'Variants' in first },
+          { label: 'First recipe has CraftingTable',            passed: first != null && 'CraftingTable' in first },
+        ], first, null);
+      }
+
+      // --- fetchStores ---
+      if (storesResult.status === 'rejected') {
+        renderChecks('stores-checks', [], null, storesResult.reason.message);
+      } else {
+        const data = storesResult.value;
+        const stores = Array.isArray(data?.Stores) ? data.Stores : [];
+        const first = stores[0] ?? null;
+        renderChecks('stores-checks', [
+          { label: 'HTTP call succeeded',                        passed: true },
+          { label: 'Response has a Stores array',               passed: Array.isArray(data?.Stores) },
+          { label: 'At least one store present',                passed: stores.length > 0 },
+          { label: 'First store has AllOffers',                 passed: first != null && 'AllOffers' in first },
+        ], first, null);
+      }
+
+      document.querySelector('.status').textContent = 'Done.';
+    }
+
+    runTests();
+  </script>
+</body>
+</html>

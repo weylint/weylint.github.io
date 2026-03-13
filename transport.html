@@ -253,7 +253,10 @@
 
 <script src="white-tiger-api.js"></script>
 <script src="transport-algo.js"></script>
+<script src="eco-render.js"></script>
 <script>
+  const esc = EcoRender.esc;
+
   const statusEl      = document.getElementById('status');
   const routesEl      = document.getElementById('routes-container');
   const topNSelect    = document.getElementById('topN');
@@ -315,7 +318,7 @@
       btn.dataset.key = key;
       btn.textContent = 'restore';
       const label = document.createElement('span');
-      label.textContent = `${storeName} buying ${itemName} @ ${fmt(parseFloat(price))}`;
+      label.innerHTML = `${EcoRender.storeNameHTML(storeName)} buying ${esc(itemName)} @ ${fmt(parseFloat(price))}`;
       entry.appendChild(btn);
       entry.appendChild(label);
       ignoredListEl.appendChild(entry);
@@ -334,14 +337,6 @@
 
   function fmt(n) {
     return '€\u202f' + n.toFixed(2);
-  }
-
-  function esc(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
   }
 
   // ── Route rendering ───────────────────────────────────────────────────────
@@ -365,9 +360,9 @@
       const profitIsZero = route.totalProfit === 0;
       summary.innerHTML = `
         <span class="route-title">
-          Buy from: <span class="route-store">${esc(route.sellStore)}</span>
+          Buy from: <span class="route-store">${EcoRender.storeNameHTML(route.sellStore)}</span>
           <span class="arrow">→</span>
-          Sell to: <span class="route-store">${esc(route.buyStore)}</span>
+          Sell to: <span class="route-store">${EcoRender.storeNameHTML(route.buyStore)}</span>
         </span>
         <span class="route-profit${profitIsZero ? ' zero' : ''}">
           ${profitIsZero ? 'break-even' : fmt(route.totalProfit) + ' profit'}

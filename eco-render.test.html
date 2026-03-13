@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>eco-render.js Tests</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #58a6ff; font-size: 1.5rem; margin-bottom: 4px; }
+    .subtitle { color: #8b949e; font-size: 0.875rem; margin-bottom: 20px; }
+    #summary {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.875rem;
+      color: #8b949e;
+    }
+    #summary.all-pass { border-color: #238636; color: #3fb950; }
+    #summary.has-fail  { border-color: #6e3030; color: #f85149; }
+    .test {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+    }
+    .test.pass { border-left: 3px solid #3fb950; }
+    .test.fail { border-left: 3px solid #f85149; }
+    .test-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+    .badge { font-size: 0.9rem; }
+    .pass .badge { color: #3fb950; }
+    .fail .badge { color: #f85149; }
+    .test-name { color: #e6edf3; font-weight: bold; }
+    .row { display: flex; gap: 6px; margin-top: 3px; color: #8b949e; }
+    .row-label { min-width: 70px; flex-shrink: 0; }
+    .row-value { color: #c9d1d9; word-break: break-all; }
+    .fail .row-value.got { color: #f85149; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>eco-render.js — Unit Tests</h1>
+  <p class="subtitle">No network access needed. All tests run in-browser.</p>
+  <div id="summary">Running…</div>
+  <div id="results"></div>
+</div>
+
+<script src="eco-render.js"></script>
+<script>
+  const tests = [
+    {
+      name: '1 — Plain text (no spans)',
+      fn: () => EcoRender.storeNameHTML('Plain text'),
+      expect: 'Plain text',
+    },
+    {
+      name: '2 — Basic color tag',
+      fn: () => EcoRender.storeNameHTML('<color=orange>Road Warriors</color>'),
+      expect: '<span style="color:orange">Road Warriors</span>',
+    },
+    {
+      name: '3 — Nested color tags',
+      fn: () => EcoRender.storeNameHTML('<color=red>Valhalla <color=green>Steel</color>works</color>'),
+      expect: '<span style="color:red">Valhalla <span style="color:green">Steel</span>works</span>',
+    },
+    {
+      name: '4 — Missing </color> (auto-closed)',
+      fn: () => EcoRender.storeNameHTML('<color=orange>Unclosed'),
+      expect: '<span style="color:orange">Unclosed</span>',
+    },
+    {
+      name: '5 — Extra </color> with no open tag (ignored)',
+      fn: () => EcoRender.storeNameHTML('Hello</color>World'),
+      expect: 'HelloWorld',
+    },
+    {
+      name: '6 — Mixed case tags',
+      fn: () => EcoRender.storeNameHTML('<Color=Orange>test</Color>'),
+      expect: '<span style="color:orange">test</span>',
+    },
+    {
+      name: '7 — Invalid color (tag stripped, text kept)',
+      fn: () => EcoRender.storeNameHTML('<color=javascript:alert(1)>bad</color>'),
+      expect: 'bad',
+    },
+    {
+      name: '8 — Hex color (#RRGGBB)',
+      fn: () => EcoRender.storeNameHTML('<color=#ff6600>Hex</color>'),
+      expect: '<span style="color:#ff6600">Hex</span>',
+    },
+    {
+      name: '9 — Hex+alpha (#RRGGBBAA)',
+      fn: () => EcoRender.storeNameHTML('<color=#ff660080>Semi</color>'),
+      expect: '<span style="color:#ff660080">Semi</span>',
+    },
+    {
+      name: '10 — HTML entities in text content',
+      fn: () => EcoRender.storeNameHTML('<color=red>A & B</color>'),
+      expect: '<span style="color:red">A &amp; B</span>',
+    },
+    {
+      name: '11 — esc() escapes <, >, &, "',
+      fn: () => EcoRender.esc('<script>alert("x&y")<\/script>'),
+      expect: '&lt;script&gt;alert(&quot;x&amp;y&quot;)&lt;\/script&gt;',
+    },
+  ];
+
+  const resultsEl = document.getElementById('results');
+  const summaryEl = document.getElementById('summary');
+  let passed = 0;
+
+  for (const t of tests) {
+    let got, ok;
+    try {
+      got = t.fn();
+      ok = got === t.expect;
+    } catch (e) {
+      got = 'THREW: ' + e.message;
+      ok = false;
+    }
+    if (ok) passed++;
+
+    const div = document.createElement('div');
+    div.className = 'test ' + (ok ? 'pass' : 'fail');
+    div.innerHTML = `
+      <div class="test-header">
+        <span class="badge">${ok ? '✓' : '✗'}</span>
+        <span class="test-name">${t.name}</span>
+      </div>
+      ${ok ? '' : `
+        <div class="row"><span class="row-label">expected:</span><span class="row-value">${escHtml(t.expect)}</span></div>
+        <div class="row"><span class="row-label">got:</span><span class="row-value got">${escHtml(got)}</span></div>
+      `}
+    `;
+    resultsEl.appendChild(div);
+  }
+
+  const total = tests.length;
+  summaryEl.textContent = `${passed} / ${total} tests passed`;
+  summaryEl.className = passed === total ? 'all-pass' : 'has-fail';
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>

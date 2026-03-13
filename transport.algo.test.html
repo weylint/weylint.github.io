@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>transport-algo.js Tests</title>
+  <style>
+    body { font-family: monospace; background: #1a1a1a; color: #ccc; padding: 2rem; max-width: 900px; margin: 0 auto; }
+    h1 { color: #fff; margin-bottom: 0.25rem; }
+    .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
+    h2 { color: #aaa; font-size: 1rem; margin: 1.5rem 0 0.5rem; border-bottom: 1px solid #333; padding-bottom: 0.25rem; }
+    .check { margin: 0.2rem 0; }
+    .pass { color: #4caf50; }
+    .fail { color: #f44336; }
+    details { margin-top: 0.75rem; }
+    summary { cursor: pointer; color: #888; font-size: 0.85rem; }
+    summary:hover { color: #ccc; }
+    pre { background: #111; border: 1px solid #333; padding: 0.75rem; overflow: auto; font-size: 0.8rem; color: #9cdcfe; margin: 0.5rem 0 0; max-height: 300px; }
+    #summary { margin-top: 1.5rem; padding: 0.75rem; background: #111; border: 1px solid #333; border-radius: 4px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>transport-algo.js</h1>
+  <p class="subtitle">Unit tests — no network access required.</p>
+
+  <div id="test-cases"></div>
+  <div id="summary"></div>
+
+  <script src="transport-algo.js"></script>
+  <script>
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    function check(label, passed) {
+      const div = document.createElement('div');
+      div.className = 'check';
+      div.innerHTML = `<span class="${passed ? 'pass' : 'fail'}">${passed ? '✓' : '✗'}</span> ${label}`;
+      return div;
+    }
+
+    function runCase(name, stores, assertions) {
+      const routes = TransportAlgo.compute(stores);
+      const section = document.getElementById('test-cases');
+
+      const h2 = document.createElement('h2');
+      h2.textContent = name;
+      section.appendChild(h2);
+
+      let allPassed = true;
+      for (const { label, passed } of assertions(routes)) {
+        const el = check(label, passed);
+        section.appendChild(el);
+        if (!passed) allPassed = false;
+      }
+
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = 'raw output';
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(routes, null, 2);
+      details.appendChild(summary);
+      details.appendChild(pre);
+      section.appendChild(details);
+
+      return allPassed;
+    }
+
+    // ── Fixture builders ───────────────────────────────────────────────────────
+
+    function store(name, enabled, currency, balance, offers) {
+      return { Name: name, Enabled: enabled, CurrencyName: currency, Balance: balance, AllOffers: offers };
+    }
+
+    function sellOffer(item, price, qty, minDurability = -1) {
+      return { Buying: false, ItemName: item, Price: price, Quantity: qty, MaxNumWanted: 0, MinDurability: minDurability };
+    }
+
+    function buyOffer(item, price, maxNumWanted, minDurability = -1) {
+      return { Buying: true, ItemName: item, Price: price, Quantity: 0, MaxNumWanted: maxNumWanted, MinDurability: minDurability };
+    }
+
+    // ── Test cases ─────────────────────────────────────────────────────────────
+
+    const results = [];
+
+    // 1. Basic profitable route
+    results.push(runCase('1. Basic profitable route', [
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood', 5, 10)]),
+      store('StoreB', true, 'Euro', 1000, [buyOffer('Wood', 10, 10)]),
+    ], routes => [
+      { label: 'At least one route found',                   passed: routes.length >= 1 },
+      { label: 'sellStore is StoreA',                        passed: routes[0]?.sellStore === 'StoreA' },
+      { label: 'buyStore is StoreB',                         passed: routes[0]?.buyStore === 'StoreB' },
+      { label: 'Item is Wood',                               passed: routes[0]?.items[0]?.itemName === 'Wood' },
+      { label: 'profitPerUnit === 5',                        passed: routes[0]?.items[0]?.profitPerUnit === 5 },
+      { label: 'qty === 10',                                 passed: routes[0]?.items[0]?.qty === 10 },
+      { label: 'totalProfit === 50',                         passed: routes[0]?.totalProfit === 50 },
+    ]));
+
+    // 2. Altruistic route (profitPerUnit == 0) appears but ranks after profitable routes
+    results.push(runCase('2. Altruistic route', [
+      // Profitable: StoreA sells Wood 5, StoreB buys Wood 10
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood', 5, 10)]),
+      store('StoreB', true, 'Euro', 1000, [buyOffer('Wood', 10, 10)]),
+      // Break-even: StoreC sells Iron 8, StoreD buys Iron 8
+      store('StoreC', true, 'Euro', 1000, [sellOffer('Iron', 8, 5)]),
+      store('StoreD', true, 'Euro', 1000, [buyOffer('Iron', 8, 5)]),
+    ], routes => {
+      const altruistic = routes.find(r => r.items.some(i => i.profitPerUnit === 0 && i.itemName === 'Iron'));
+      const profitable  = routes.find(r => r.items.some(i => i.profitPerUnit === 5  && i.itemName === 'Wood'));
+      const altIdx  = routes.indexOf(altruistic);
+      const profIdx = routes.indexOf(profitable);
+      return [
+        { label: 'Profitable route found',                   passed: profitable != null },
+        { label: 'Altruistic route found',                   passed: altruistic != null },
+        { label: 'Altruistic route has totalProfit === 0',   passed: altruistic?.totalProfit === 0 },
+        { label: 'Profitable route ranked before altruistic',passed: profIdx !== -1 && altIdx !== -1 && profIdx < altIdx },
+      ];
+    }));
+
+    // 3. Disabled store excluded
+    results.push(runCase('3. Disabled store excluded', [
+      store('DisabledStore', false, 'Euro', 1000, [sellOffer('Wood', 5, 10)]),
+      store('StoreB',        true,  'Euro', 1000, [buyOffer('Wood', 10, 10)]),
+    ], routes => [
+      { label: 'No routes generated (disabled store ignored)', passed: routes.length === 0 },
+    ]));
+
+    // 4. Non-Euro store excluded
+    results.push(runCase('4. Non-Euro store excluded', [
+      store('CreditsStore', true, 'Credits', 1000, [sellOffer('Wood', 5, 10)]),
+      store('StoreB',       true, 'Euro',    1000, [buyOffer('Wood', 10, 10)]),
+    ], routes => [
+      { label: 'No routes generated (non-Euro store ignored)', passed: routes.length === 0 },
+    ]));
+
+    // 5. Same-store pair excluded
+    results.push(runCase('5. Same-store pair excluded', [
+      store('StoreA', true, 'Euro', 1000, [
+        sellOffer('Wood', 5,  10),
+        buyOffer ('Wood', 10, 10),
+      ]),
+    ], routes => [
+      { label: 'No routes generated (same store)', passed: routes.length === 0 },
+    ]));
+
+    // 6. Durability filter: sell.MinDurability < buy.MinDurability → excluded
+    results.push(runCase('6. Durability filter', [
+      // Should be excluded: sell dur 50 < buy dur 75
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood',  5, 10, 50)]),
+      store('StoreB', true, 'Euro', 1000, [buyOffer ('Wood', 10, 10, 75)]),
+      // Should be included: sell dur 80 >= buy dur 75
+      store('StoreC', true, 'Euro', 1000, [sellOffer('Iron',  3, 10, 80)]),
+      store('StoreD', true, 'Euro', 1000, [buyOffer ('Iron',  9, 10, 75)]),
+    ], routes => {
+      const hasWood = routes.some(r => r.items.some(i => i.itemName === 'Wood'));
+      const hasIron = routes.some(r => r.items.some(i => i.itemName === 'Iron'));
+      return [
+        { label: 'Wood pair (dur 50 < 75) excluded',  passed: !hasWood },
+        { label: 'Iron pair (dur 80 >= 75) included', passed: hasIron  },
+      ];
+    }));
+
+    // 7. Balance cap: buyer balance limits effective qty
+    results.push(runCase('7. Balance cap', [
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood',  5, 20)]),
+      // StoreB balance=50, buyPrice=10 → can afford floor(50/10)=5 units
+      store('StoreB', true, 'Euro', 50,   [buyOffer ('Wood', 10, 20)]),
+    ], routes => [
+      { label: 'Route found',                          passed: routes.length >= 1 },
+      { label: 'qty capped to 5 by balance (50/10)',   passed: routes[0]?.items[0]?.qty === 5 },
+    ]));
+
+    // 8. MaxNumWanted cap
+    results.push(runCase('8. MaxNumWanted cap', [
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood', 5, 20)]),
+      // maxNumWanted=7, balance=1000 → affordable cap 100; effective qty = 7
+      store('StoreB', true, 'Euro', 1000, [buyOffer ('Wood', 10, 7)]),
+    ], routes => [
+      { label: 'Route found',                         passed: routes.length >= 1 },
+      { label: 'qty capped to 7 by maxNumWanted',     passed: routes[0]?.items[0]?.qty === 7 },
+    ]));
+
+    // 9. Route grouping: two items on the same store pair → single route
+    results.push(runCase('9. Route grouping', [
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood', 5, 10), sellOffer('Stone', 2, 10)]),
+      store('StoreB', true, 'Euro', 1000, [buyOffer ('Wood', 10, 10), buyOffer('Stone', 6, 10)]),
+    ], routes => [
+      { label: 'Exactly one route',                   passed: routes.length === 1 },
+      { label: 'Route has 2 items',                   passed: routes[0]?.items.length === 2 },
+      { label: 'sellStore is StoreA',                 passed: routes[0]?.sellStore === 'StoreA' },
+      { label: 'buyStore is StoreB',                  passed: routes[0]?.buyStore === 'StoreB' },
+    ]));
+
+    // 10. Route sort order: higher total profit ranks first
+    results.push(runCase('10. Route sort order', [
+      // Route A→B: Wood profit = 5 × 10 = 50
+      store('StoreA', true, 'Euro', 1000, [sellOffer('Wood',  5, 10)]),
+      store('StoreB', true, 'Euro', 1000, [buyOffer ('Wood', 10, 10)]),
+      // Route C→D: Iron profit = 20 × 10 = 200  (should rank first)
+      store('StoreC', true, 'Euro', 1000, [sellOffer('Iron',  5, 10)]),
+      store('StoreD', true, 'Euro', 1000, [buyOffer ('Iron', 25, 10)]),
+    ], routes => {
+      const first  = routes[0];
+      const second = routes[1];
+      return [
+        { label: 'At least 2 routes',                      passed: routes.length >= 2 },
+        { label: 'First route has higher totalProfit',      passed: first?.totalProfit >= second?.totalProfit },
+        { label: 'Top route is C→D (profit 200)',          passed: first?.sellStore === 'StoreC' && first?.buyStore === 'StoreD' },
+        { label: 'Second route is A→B (profit 50)',        passed: second?.sellStore === 'StoreA' && second?.buyStore === 'StoreB' },
+      ];
+    }));
+
+    // ── Summary ────────────────────────────────────────────────────────────────
+
+    const passed = results.filter(Boolean).length;
+    const total  = results.length;
+    const summaryEl = document.getElementById('summary');
+    summaryEl.style.color = passed === total ? '#4caf50' : '#f44336';
+    summaryEl.textContent = `${passed} / ${total} test cases passed`;
+  </script>
+</body>
+</html>

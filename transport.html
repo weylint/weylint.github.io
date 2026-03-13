@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transport Profits — White Tiger</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    header {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    h1 { color: #58a6ff; font-size: 1.5rem; margin-bottom: 6px; }
+    header p { color: #8b949e; font-size: 0.875rem; margin-bottom: 14px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .controls label { color: #8b949e; font-size: 0.875rem; display: flex; align-items: center; gap: 6px; }
+
+    select {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    select:focus { outline: 2px solid #58a6ff; outline-offset: 1px; }
+
+    #count-label { color: #8b949e; font-size: 0.8rem; }
+
+    #status {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px 20px;
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+
+    #status.error { color: #f85149; border-color: #6e3030; }
+
+    /* ── Route sections ── */
+    .route {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .route summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      gap: 12px;
+    }
+
+    .route summary::-webkit-details-marker { display: none; }
+
+    .route summary:hover { background: #1c2128; }
+
+    .route-title {
+      font-size: 0.9rem;
+      color: #c9d1d9;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .route-title .arrow { color: #58a6ff; margin: 0 6px; }
+
+    .route-store { color: #e6edf3; font-weight: bold; }
+
+    .route-profit {
+      font-size: 0.85rem;
+      color: #3fb950;
+      white-space: nowrap;
+    }
+
+    .route-profit.zero { color: #6e7681; }
+
+    .collapse-icon {
+      color: #6e7681;
+      font-size: 0.75rem;
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+
+    details[open] .collapse-icon { transform: rotate(90deg); }
+
+    /* ── Item table ── */
+    .item-table-wrap {
+      overflow-x: auto;
+      border-top: 1px solid #30363d;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    th {
+      background: #0d1117;
+      color: #8b949e;
+      text-align: left;
+      padding: 7px 12px;
+      white-space: nowrap;
+      font-weight: normal;
+    }
+
+    td {
+      padding: 6px 12px;
+      border-top: 1px solid #21262d;
+      white-space: nowrap;
+    }
+
+    tr.break-even td { opacity: 0.45; }
+
+    td.num { text-align: right; }
+    th.num { text-align: right; }
+
+    td.profit-val { color: #3fb950; }
+    td.profit-zero { color: #6e7681; }
+
+    .break-even-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      background: #21262d;
+      color: #6e7681;
+      border-radius: 3px;
+      padding: 1px 5px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    #routes-container { margin-top: 4px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Transport Profits</h1>
+    <p>Buy low from one store, sell high to another. Routes sorted by total profit.</p>
+    <div class="controls">
+      <label>
+        Show top
+        <select id="topN">
+          <option value="10" selected>10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="0">All</option>
+        </select>
+        routes
+      </label>
+      <span id="count-label"></span>
+    </div>
+  </header>
+
+  <div id="status">Loading store data…</div>
+  <div id="routes-container"></div>
+</div>
+
+<script src="white-tiger-api.js"></script>
+<script src="transport-algo.js"></script>
+<script>
+  const statusEl    = document.getElementById('status');
+  const routesEl    = document.getElementById('routes-container');
+  const topNSelect  = document.getElementById('topN');
+  const countLabel  = document.getElementById('count-label');
+
+  let allRoutes = [];
+
+  function fmt(n) {
+    return '€\u202f' + n.toFixed(2);
+  }
+
+  function renderRoutes() {
+    routesEl.innerHTML = '';
+
+    const topN   = parseInt(topNSelect.value, 10);
+    const total  = allRoutes.length;
+    const shown  = topN === 0 ? total : Math.min(topN, total);
+    const routes = allRoutes.slice(0, shown);
+
+    countLabel.textContent = `Showing ${shown} of ${total} route${total !== 1 ? 's' : ''}`;
+
+    for (const route of routes) {
+      const details = document.createElement('details');
+      details.open = true;
+      details.className = 'route';
+
+      const summary = document.createElement('summary');
+      const profitIsZero = route.totalProfit === 0;
+      summary.innerHTML = `
+        <span class="route-title">
+          Buy from: <span class="route-store">${esc(route.sellStore)}</span>
+          <span class="arrow">→</span>
+          Sell to: <span class="route-store">${esc(route.buyStore)}</span>
+        </span>
+        <span class="route-profit${profitIsZero ? ' zero' : ''}">
+          ${profitIsZero ? 'break-even' : fmt(route.totalProfit) + ' profit'}
+        </span>
+        <span class="collapse-icon">▶</span>
+      `;
+      details.appendChild(summary);
+
+      const wrap  = document.createElement('div');
+      wrap.className = 'item-table-wrap';
+
+      const table = document.createElement('table');
+      table.innerHTML = `<thead><tr>
+        <th>Item</th>
+        <th class="num">Buy price</th>
+        <th class="num">Sell price</th>
+        <th class="num">Profit/unit</th>
+        <th class="num">Max qty</th>
+        <th class="num">Total profit</th>
+      </tr></thead>`;
+
+      const tbody = document.createElement('tbody');
+      for (const item of route.items) {
+        const breakEven = item.profitPerUnit === 0;
+        const tr = document.createElement('tr');
+        if (breakEven) tr.className = 'break-even';
+        tr.innerHTML = `
+          <td>${esc(item.itemName)}${breakEven ? '<span class="break-even-badge">break-even</span>' : ''}</td>
+          <td class="num">${fmt(item.sellPrice)}</td>
+          <td class="num">${fmt(item.buyPrice)}</td>
+          <td class="num ${breakEven ? 'profit-zero' : 'profit-val'}">${fmt(item.profitPerUnit)}</td>
+          <td class="num">${item.qty}</td>
+          <td class="num ${breakEven ? 'profit-zero' : 'profit-val'}">${fmt(item.totalProfit)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+      details.appendChild(wrap);
+      routesEl.appendChild(details);
+    }
+
+    if (routes.length === 0) {
+      routesEl.innerHTML = '<div id="status">No profitable routes found.</div>';
+    }
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  topNSelect.addEventListener('change', renderRoutes);
+
+  async function init() {
+    try {
+      const data = await WhiteTigerAPI.fetchStores();
+      const stores = Array.isArray(data?.Stores) ? data.Stores : [];
+      allRoutes = TransportAlgo.compute(stores);
+      statusEl.style.display = 'none';
+      renderRoutes();
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'error';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

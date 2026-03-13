@@ -26,7 +26,7 @@
     }
 
     h1 { color: #58a6ff; font-size: 1.5rem; margin-bottom: 6px; }
-    header p { color: #8b949e; font-size: 0.875rem; margin-bottom: 14px; }
+    header > p { color: #8b949e; font-size: 0.875rem; margin-bottom: 14px; }
 
     .controls {
       display: flex;
@@ -52,6 +52,54 @@
 
     #count-label { color: #8b949e; font-size: 0.8rem; }
 
+    /* ── Ignored orders section ── */
+    #ignored-section {
+      margin-top: 14px;
+      border-top: 1px solid #21262d;
+      padding-top: 12px;
+    }
+
+    #ignored-section summary {
+      cursor: pointer;
+      color: #8b949e;
+      font-size: 0.8rem;
+      list-style: none;
+      user-select: none;
+    }
+
+    #ignored-section summary::-webkit-details-marker { display: none; }
+    #ignored-section summary:hover { color: #c9d1d9; }
+
+    #ignored-list {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ignored-entry {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #8b949e;
+    }
+
+    .unignore-btn {
+      background: none;
+      border: 1px solid #30363d;
+      border-radius: 3px;
+      color: #8b949e;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 1px 6px;
+      line-height: 1.4;
+    }
+
+    .unignore-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+
+    /* ── Status ── */
     #status {
       background: #161b22;
       border: 1px solid #30363d;
@@ -84,7 +132,6 @@
     }
 
     .route summary::-webkit-details-marker { display: none; }
-
     .route summary:hover { background: #1c2128; }
 
     .route-title {
@@ -95,15 +142,9 @@
     }
 
     .route-title .arrow { color: #58a6ff; margin: 0 6px; }
-
     .route-store { color: #e6edf3; font-weight: bold; }
 
-    .route-profit {
-      font-size: 0.85rem;
-      color: #3fb950;
-      white-space: nowrap;
-    }
-
+    .route-profit { font-size: 0.85rem; color: #3fb950; white-space: nowrap; }
     .route-profit.zero { color: #6e7681; }
 
     .collapse-icon {
@@ -147,7 +188,7 @@
     td.num { text-align: right; }
     th.num { text-align: right; }
 
-    td.profit-val { color: #3fb950; }
+    td.profit-val  { color: #3fb950; }
     td.profit-zero { color: #6e7681; }
 
     .break-even-badge {
@@ -160,6 +201,23 @@
       margin-left: 6px;
       vertical-align: middle;
     }
+
+    /* ── Ignore button inside table rows ── */
+    th.ignore-col { width: 28px; padding: 7px 8px; }
+    td.ignore-col { padding: 4px 8px; text-align: center; }
+
+    .ignore-btn {
+      background: none;
+      border: none;
+      color: #3d444d;
+      cursor: pointer;
+      font-size: 0.9rem;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+
+    .ignore-btn:hover { color: #f85149; background: #2a1a1a; }
 
     #routes-container { margin-top: 4px; }
   </style>
@@ -182,6 +240,11 @@
       </label>
       <span id="count-label"></span>
     </div>
+
+    <details id="ignored-section" style="display:none">
+      <summary id="ignored-summary">Ignored buy orders (0)</summary>
+      <div id="ignored-list"></div>
+    </details>
   </header>
 
   <div id="status">Loading store data…</div>
@@ -191,16 +254,97 @@
 <script src="white-tiger-api.js"></script>
 <script src="transport-algo.js"></script>
 <script>
-  const statusEl    = document.getElementById('status');
-  const routesEl    = document.getElementById('routes-container');
-  const topNSelect  = document.getElementById('topN');
-  const countLabel  = document.getElementById('count-label');
+  const statusEl      = document.getElementById('status');
+  const routesEl      = document.getElementById('routes-container');
+  const topNSelect    = document.getElementById('topN');
+  const countLabel    = document.getElementById('count-label');
+  const ignoredSection = document.getElementById('ignored-section');
+  const ignoredSummary = document.getElementById('ignored-summary');
+  const ignoredListEl  = document.getElementById('ignored-list');
 
-  let allRoutes = [];
+  // ── Ignored buy orders ────────────────────────────────────────────────────
+  // A buy order is identified by "storeName|||itemName|||price".
+  // Ignoring one removes it from ALL route calculations, not just one pair.
+
+  const STORAGE_KEY = 'wt-transport-ignored-buys';
+  let ignoredBuys = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+  let rawStores   = [];
+  let allRoutes   = [];
+
+  function ignoredKey(storeName, itemName, price) {
+    return `${storeName}|||${itemName}|||${price}`;
+  }
+
+  function saveIgnored() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ignoredBuys]));
+  }
+
+  // Strip ignored buy offers from raw stores before passing to the algorithm.
+  function filterStores(stores) {
+    if (ignoredBuys.size === 0) return stores;
+    return stores.map(store => ({
+      ...store,
+      AllOffers: (store.AllOffers || []).filter(offer =>
+        !offer.Buying || !ignoredBuys.has(ignoredKey(store.Name, offer.ItemName, offer.Price))
+      ),
+    }));
+  }
+
+  function recompute() {
+    allRoutes = TransportAlgo.compute(filterStores(rawStores));
+    renderRoutes();
+    renderIgnored();
+  }
+
+  // ── Ignored list UI ───────────────────────────────────────────────────────
+
+  function renderIgnored() {
+    if (ignoredBuys.size === 0) {
+      ignoredSection.style.display = 'none';
+      return;
+    }
+    ignoredSection.style.display = '';
+    ignoredSummary.textContent = `Ignored buy orders (${ignoredBuys.size})`;
+    ignoredListEl.innerHTML = '';
+    for (const key of [...ignoredBuys].sort()) {
+      const [storeName, itemName, price] = key.split('|||');
+      const entry = document.createElement('div');
+      entry.className = 'ignored-entry';
+      const btn = document.createElement('button');
+      btn.className = 'unignore-btn';
+      btn.dataset.key = key;
+      btn.textContent = 'restore';
+      const label = document.createElement('span');
+      label.textContent = `${storeName} buying ${itemName} @ ${fmt(parseFloat(price))}`;
+      entry.appendChild(btn);
+      entry.appendChild(label);
+      ignoredListEl.appendChild(entry);
+    }
+  }
+
+  ignoredListEl.addEventListener('click', e => {
+    const btn = e.target.closest('.unignore-btn');
+    if (!btn) return;
+    ignoredBuys.delete(btn.dataset.key);
+    saveIgnored();
+    recompute();
+  });
+
+  // ── Formatting ────────────────────────────────────────────────────────────
 
   function fmt(n) {
     return '€\u202f' + n.toFixed(2);
   }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Route rendering ───────────────────────────────────────────────────────
 
   function renderRoutes() {
     routesEl.innerHTML = '';
@@ -237,6 +381,7 @@
 
       const table = document.createElement('table');
       table.innerHTML = `<thead><tr>
+        <th class="ignore-col"></th>
         <th>Item</th>
         <th class="num">Buy price</th>
         <th class="num">Sell price</th>
@@ -248,9 +393,13 @@
       const tbody = document.createElement('tbody');
       for (const item of route.items) {
         const breakEven = item.profitPerUnit === 0;
+        const key = ignoredKey(route.buyStore, item.itemName, item.buyPrice);
         const tr = document.createElement('tr');
         if (breakEven) tr.className = 'break-even';
         tr.innerHTML = `
+          <td class="ignore-col">
+            <button class="ignore-btn" data-key="${esc(key)}" title="Ignore this buy order everywhere">✕</button>
+          </td>
           <td>${esc(item.itemName)}${breakEven ? '<span class="break-even-badge">break-even</span>' : ''}</td>
           <td class="num">${fmt(item.sellPrice)}</td>
           <td class="num">${fmt(item.buyPrice)}</td>
@@ -271,23 +420,27 @@
     }
   }
 
-  function esc(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  // Event delegation — one listener handles all ignore buttons across all rendered routes.
+  routesEl.addEventListener('click', e => {
+    const btn = e.target.closest('.ignore-btn');
+    if (!btn) return;
+    ignoredBuys.add(btn.dataset.key);
+    saveIgnored();
+    recompute();
+  });
 
   topNSelect.addEventListener('change', renderRoutes);
+
+  // ── Init ──────────────────────────────────────────────────────────────────
 
   async function init() {
     try {
       const data = await WhiteTigerAPI.fetchStores();
-      const stores = Array.isArray(data?.Stores) ? data.Stores : [];
-      allRoutes = TransportAlgo.compute(stores);
+      rawStores = Array.isArray(data?.Stores) ? data.Stores : [];
+      allRoutes = TransportAlgo.compute(filterStores(rawStores));
       statusEl.style.display = 'none';
       renderRoutes();
+      renderIgnored();
     } catch (err) {
       statusEl.textContent = 'Error: ' + err.message;
       statusEl.className = 'error';

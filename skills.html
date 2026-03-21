@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skills - White Tiger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        .tier {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .tier-header {
+            background: #0d1117;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .tier-header .stars {
+            color: #e3b341;
+            font-size: 1rem;
+            letter-spacing: 1px;
+        }
+
+        .tier-header .tier-label {
+            color: #8b949e;
+            font-size: 0.8rem;
+        }
+
+        .skill-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        }
+
+        .skill-item {
+            padding: 10px 16px;
+            border-bottom: 1px solid #21262d;
+            border-right: 1px solid #21262d;
+            font-size: 0.875rem;
+        }
+
+        .skill-item:hover {
+            background: #1c2128;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Skills</h1>
+            <p>Playtest server — skill star costs</p>
+        </header>
+
+        <div id="skills-container"></div>
+    </div>
+
+    <script>
+        const skills = [
+            { "Name": "Gathering", "Stars": 1 },
+            { "Name": "Hunting", "Stars": 1 },
+            { "Name": "Logging", "Stars": 1 },
+            { "Name": "Mining", "Stars": 1 },
+            { "Name": "Basic Engineering", "Stars": 2 },
+            { "Name": "Butchery", "Stars": 2 },
+            { "Name": "Campfire Cooking", "Stars": 2 },
+            { "Name": "Carpentry", "Stars": 2 },
+            { "Name": "Farming", "Stars": 2 },
+            { "Name": "Fertilizers", "Stars": 2 },
+            { "Name": "Masonry", "Stars": 2 },
+            { "Name": "Milling", "Stars": 2 },
+            { "Name": "Painting", "Stars": 2 },
+            { "Name": "Baking", "Stars": 3 },
+            { "Name": "Blacksmith", "Stars": 3 },
+            { "Name": "Cooking", "Stars": 3 },
+            { "Name": "Glassworking", "Stars": 3 },
+            { "Name": "Paper Milling", "Stars": 3 },
+            { "Name": "Pottery", "Stars": 3 },
+            { "Name": "Shipwright", "Stars": 3 },
+            { "Name": "Smelting", "Stars": 3 },
+            { "Name": "Tailoring", "Stars": 3 },
+            { "Name": "Advanced Baking", "Stars": 4 },
+            { "Name": "Advanced Cooking", "Stars": 4 },
+            { "Name": "Advanced Smelting", "Stars": 4 },
+            { "Name": "Electronics", "Stars": 4 },
+            { "Name": "Mechanics", "Stars": 4 },
+            { "Name": "Oil Drilling", "Stars": 4 },
+            { "Name": "Advanced Masonry", "Stars": 5 },
+            { "Name": "Composites", "Stars": 5 },
+            { "Name": "Cutting Edge Cooking", "Stars": 5 },
+            { "Name": "Industry", "Stars": 5 }
+        ];
+
+        const maxStars = Math.max(...skills.map(s => s.Stars));
+        const container = document.getElementById('skills-container');
+
+        for (let tier = 1; tier <= maxStars; tier++) {
+            const tierSkills = skills.filter(s => s.Stars === tier);
+            const starStr = '★'.repeat(tier) + '☆'.repeat(maxStars - tier);
+
+            const div = document.createElement('div');
+            div.className = 'tier';
+            div.innerHTML = `
+                <div class="tier-header">
+                    <span class="stars">${starStr}</span>
+                    <span class="tier-label">${tier} star${tier > 1 ? 's' : ''} — ${tierSkills.length} skill${tierSkills.length > 1 ? 's' : ''}</span>
+                </div>
+                <div class="skill-list">
+                    ${tierSkills.map(s => `<div class="skill-item">${s.Name}</div>`).join('')}
+                </div>
+            `;
+            container.appendChild(div);
+        }
+    </script>
+</body>
+</html>

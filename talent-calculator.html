@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talent Calculator - White Tiger</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header h1 {
+      color: #58a6ff;
+      font-size: 1rem;
+      font-weight: normal;
+    }
+
+    .star-counter {
+      font-size: 0.9rem;
+      color: #e3b341;
+    }
+
+    .reset-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+    .reset-btn:hover { border-color: #f85149; color: #f85149; }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      font-size: 0.75rem;
+      color: #8b949e;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      border: 2px solid;
+      flex-shrink: 0;
+    }
+
+    /* ── SVG area ── */
+    .tree-area {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #tree-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      display: block;
+    }
+    #tree-svg.dragging { cursor: grabbing; }
+
+    /* ── Info bar ── */
+    .info-bar {
+      background: #161b22;
+      border-top: 1px solid #30363d;
+      padding: 10px 20px;
+      min-height: 68px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .info-title {
+      font-size: 0.875rem;
+      color: #c9d1d9;
+      margin-bottom: 3px;
+    }
+    .info-detail {
+      font-size: 0.8rem;
+      color: #8b949e;
+      line-height: 1.4;
+    }
+    .info-hint {
+      font-size: 0.75rem;
+      color: #6e7681;
+      margin-top: 2px;
+    }
+    .info-empty { font-size: 0.8rem; color: #6e7681; }
+
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed;
+      display: none;
+      pointer-events: none;
+      z-index: 100;
+      max-width: 280px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      color: #c9d1d9;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    #tooltip .tt-title {
+      font-size: 0.85rem;
+      margin-bottom: 5px;
+    }
+    #tooltip .tt-desc { color: #8b949e; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Talent Calculator</h1>
+  <span class="star-counter">★ <span id="star-count">0</span> stars</span>
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="border-color:#3fb950; background:#3fb950;"></div>
+      Skill (allocated)
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="border-color:#3fb950;"></div>
+      Lvl 3 talent
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="border-color:#58a6ff;"></div>
+      Lvl 6 talent
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="border-color:#e3b341;"></div>
+      Skill cost (stars)
+    </div>
+  </div>
+  <button class="reset-btn" id="reset-btn">Reset</button>
+</div>
+
+<div class="tree-area">
+  <svg id="tree-svg">
+    <g id="tree-root">
+      <g id="edge-group"></g>
+      <g id="node-group"></g>
+    </g>
+  </svg>
+</div>
+
+<div class="info-bar">
+  <div id="info-content">
+    <span class="info-empty">Hover a node for details · Click a skill to allocate (costs its star value) · Click a talent on an allocated skill to take it (costs 1 star) · 1 lvl-3 and 1 lvl-6 talent per skill · Scroll to zoom · Drag to pan</span>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // ── Skill star costs ──────────────────────────────────────────────
+  const skillStars = {
+    "Gathering": 1, "Hunting": 1, "Logging": 1, "Mining": 1,
+    "Basic Engineering": 2, "Butchery": 2, "Campfire Cooking": 2, "Carpentry": 2,
+    "Farming": 2, "Fertilizers": 2, "Masonry": 2, "Milling": 2, "Painting": 2,
+    "Baking": 3, "Blacksmith": 3, "Cooking": 3, "Glassworking": 3,
+    "Paper Milling": 3, "Pottery": 3, "Shipwright": 3, "Smelting": 3, "Tailoring": 3,
+    "Advanced Baking": 4, "Advanced Cooking": 4, "Advanced Smelting": 4,
+    "Electronics": 4, "Mechanics": 4, "Oil Drilling": 4,
+    "Advanced Masonry": 5, "Composites": 5, "Cutting Edge Cooking": 5, "Industry": 5
+  };
+
+  // ── Radii ─────────────────────────────────────────────────────────
+  const R_PROF  = 180;
+  const R_SKILL = 390;
+  const R_T3    = 510;
+  const R_T6    = 610;
+
+  // ── State ─────────────────────────────────────────────────────────
+  const state = {
+    allocatedSkills:   new Set(),   // skill name strings
+    takenTalents:      new Set(),   // talent.class strings
+    takenBySkillLevel: new Map(),   // "skillId-level" → talentClass
+    totalStars: 0
+  };
+
+  let allNodes = [], allEdges = [];
+  const nodeMap = {}, nodeEls = {}, edgeEls = {};
+
+  // ── Pan / zoom ────────────────────────────────────────────────────
+  const view = { x: 0, y: 0, scale: 1 };
+  let dragging = false, dragStart = null, didDrag = false;
+
+  const svg      = document.getElementById('tree-svg');
+  const treeRoot = document.getElementById('tree-root');
+  const edgeGrp  = document.getElementById('edge-group');
+  const nodeGrp  = document.getElementById('node-group');
+
+  function applyTransform() {
+    treeRoot.setAttribute('transform',
+      `translate(${view.x},${view.y}) scale(${view.scale})`);
+  }
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 0.85 : 1.18;
+    const newScale = Math.max(0.2, Math.min(5, view.scale * factor));
+    const rect = svg.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    view.x = mx - (mx - view.x) * (newScale / view.scale);
+    view.y = my - (my - view.y) * (newScale / view.scale);
+    view.scale = newScale;
+    applyTransform();
+  }, { passive: false });
+
+  svg.addEventListener('mousedown', e => {
+    dragging = true;
+    didDrag = false;
+    dragStart = { x: e.clientX - view.x, y: e.clientY - view.y };
+    svg.classList.add('dragging');
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const nx = e.clientX - dragStart.x;
+    const ny = e.clientY - dragStart.y;
+    if (Math.abs(nx - view.x) > 3 || Math.abs(ny - view.y) > 3) didDrag = true;
+    view.x = nx;
+    view.y = ny;
+    applyTransform();
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    svg.classList.remove('dragging');
+  });
+
+  // ── Tooltip ───────────────────────────────────────────────────────
+  const tooltip = document.getElementById('tooltip');
+  let mouseX = 0, mouseY = 0;
+
+  window.addEventListener('mousemove', e => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    if (tooltip.style.display !== 'none') positionTooltip();
+  });
+
+  function positionTooltip() {
+    const pad = 14;
+    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    let x = mouseX + pad, y = mouseY + pad;
+    if (x + tw > window.innerWidth  - 8) x = mouseX - tw - pad;
+    if (y + th > window.innerHeight - 8) y = mouseY - th - pad;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  }
+
+  function showTooltip(node) {
+    const color = node.level === 6 ? '#58a6ff' : '#3fb950';
+    tooltip.innerHTML =
+      `<div class="tt-title">${node.name} <span style="color:${color};font-size:.75rem">lvl ${node.level}</span></div>` +
+      `<div class="tt-desc">${node.description}</div>`;
+    tooltip.style.display = 'block';
+    positionTooltip();
+  }
+
+  function hideTooltip() {
+    tooltip.style.display = 'none';
+  }
+
+  // ── Layout ────────────────────────────────────────────────────────
+  function computeLayout(professions) {
+    const nodes = [], edges = [];
+    const total = professions.reduce((s, p) => s + p.skills.length, 0);
+    const profSlice = (Math.PI * 2) / professions.length;  // equal for professions
+    let skillStart = -Math.PI / 2;  // proportional tracker for skills
+
+    professions.forEach((prof, pi) => {
+      // Profession: evenly spaced
+      const profMid = -Math.PI / 2 + profSlice * pi + profSlice / 2;
+
+      const profNode = {
+        type: 'profession',
+        id: `prof:${prof.profession}`,
+        name: prof.profession,
+        angle: profMid,
+        x: R_PROF * Math.cos(profMid),
+        y: R_PROF * Math.sin(profMid),
+        r: 42
+      };
+      nodes.push(profNode);
+
+      // Skills: proportional slice (as originally)
+      const skillSlice = (prof.skills.length / total) * Math.PI * 2;
+
+      prof.skills.forEach((skill, si) => {
+        const skillAngle = skillStart + (si + 0.5) * (skillSlice / prof.skills.length);
+        const skillNode = {
+          type: 'skill',
+          id: skill.skill,
+          name: skill.skill,
+          professionId: profNode.id,
+          professionName: prof.profession,
+          angle: skillAngle,
+          x: R_SKILL * Math.cos(skillAngle),
+          y: R_SKILL * Math.sin(skillAngle),
+          r: 36,
+          stars: skillStars[skill.skill] || 1,
+          talentData: skill.talents
+        };
+        nodes.push(skillNode);
+        edges.push({ from: profNode.id, to: skillNode.id, type: 'prof-skill' });
+
+        // Talent nodes: group by level, spread radially
+        [3, 6].forEach(lvl => {
+          const talents = skill.talents.filter(t => t.level === lvl);
+          if (!talents.length) return;
+          const R = lvl === 3 ? R_T3 : R_T6;
+          const spread = (talents.length - 1) * 0.12; // radians between outermost
+          talents.forEach((t, ti) => {
+            const offset = talents.length > 1
+              ? -spread / 2 + ti * (spread / (talents.length - 1))
+              : 0;
+            const ta = skillAngle + offset;
+            nodes.push({
+              type: 'talent',
+              id: t.class,
+              name: t.display_name.replace(/\s*:.*$/, ''),
+              description: t.description,
+              level: lvl,
+              levelKey: `${skill.skill}-${lvl}`,
+              skillId: skill.skill,
+              x: R * Math.cos(ta),
+              y: R * Math.sin(ta),
+              r: 13
+            });
+            edges.push({ from: skillNode.id, to: t.class, type: 'skill-talent', level: lvl });
+          });
+        });
+      });
+
+      skillStart += skillSlice;
+    });
+
+    return { nodes, edges };
+  }
+
+  // ── Text helpers ─────────────────────────────────────────────────
+  function wrapText(str, maxChars) {
+    const words = str.split(' ');
+    const lines = [];
+    let cur = '';
+    words.forEach(w => {
+      if (!cur) { cur = w; }
+      else if ((cur + ' ' + w).length <= maxChars) { cur += ' ' + w; }
+      else { lines.push(cur); cur = w; }
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  // ── Render SVG ────────────────────────────────────────────────────
+  function renderTree() {
+    // Edges (rendered before nodes so nodes sit on top)
+    allEdges.forEach(edge => {
+      const a = nodeMap[edge.from], b = nodeMap[edge.to];
+      if (!a || !b) return;
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+      line.setAttribute('stroke', '#30363d');
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-linecap', 'round');
+      if (edge.type === 'skill-talent') line.style.display = 'none';
+      edgeGrp.appendChild(line);
+      edgeEls[`${edge.from}→${edge.to}`] = line;
+    });
+
+    // Nodes
+    allNodes.forEach(node => {
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.style.cursor = 'pointer';
+
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('cx', node.x);
+      circle.setAttribute('cy', node.y);
+      circle.setAttribute('r', node.r);
+      circle.setAttribute('fill', '#161b22');
+      circle.setAttribute('stroke', '#30363d');
+      circle.setAttribute('stroke-width', '2');
+      g.appendChild(circle);
+
+      if (node.type === 'profession') {
+        // Name wrapped inside circle
+        const lines = wrapText(node.name, 10);
+        const lineH = 11;
+        const startY = node.y - ((lines.length - 1) * lineH) / 2;
+        lines.forEach((line, i) => {
+          g.appendChild(svgText(node.x, startY + lineH * i + 4, line, {
+            'text-anchor': 'middle', 'font-size': '9',
+            'fill': '#58a6ff', 'pointer-events': 'none'
+          }));
+        });
+      } else if (node.type === 'skill') {
+        // Star cost + wrapped skill name inside circle
+        const lines = wrapText(node.name, 11);
+        // Vertical layout: star row then name lines, centred in circle
+        const totalLines = 1 + lines.length;
+        const lineH = 10;
+        const startY = node.y - ((totalLines - 1) * lineH) / 2;
+
+        const starTxt = svgText(node.x, startY + 3, `★${node.stars}`, {
+          'text-anchor': 'middle', 'font-size': '9', 'font-weight': 'bold',
+          'fill': '#e3b341', 'pointer-events': 'none'
+        });
+        g.appendChild(starTxt);
+
+        lines.forEach((line, i) => {
+          const nameTxt = svgText(node.x, startY + lineH * (i + 1) + 3, line, {
+            'text-anchor': 'middle', 'font-size': '8',
+            'fill': '#c9d1d9', 'pointer-events': 'none'
+          });
+          g.appendChild(nameTxt);
+        });
+      } else if (node.type === 'talent') {
+        g.style.display = 'none';  // hidden until skill allocated
+      }
+
+      g.addEventListener('click', e => {
+        if (didDrag) return;
+        e.stopPropagation();
+        handleClick(node);
+      });
+      if (node.type === 'talent') {
+        g.addEventListener('mouseenter', () => showTooltip(node));
+        g.addEventListener('mouseleave', hideTooltip);
+      } else {
+        g.addEventListener('mouseenter', () => showInfo(node));
+      }
+
+      nodeGrp.appendChild(g);
+      nodeEls[node.id] = g;
+    });
+  }
+
+function svgText(x, y, content, attrs) {
+    const t = document.createElementNS(SVG_NS, 'text');
+    t.setAttribute('x', x); t.setAttribute('y', y);
+    Object.entries(attrs).forEach(([k, v]) => t.setAttribute(k, v));
+    t.textContent = content;
+    return t;
+  }
+
+  // ── Interaction ───────────────────────────────────────────────────
+  function handleClick(node) {
+    if (node.type === 'profession') return;
+
+    if (node.type === 'skill') {
+      if (state.allocatedSkills.has(node.id)) {
+        // Can't deallocate if talents are taken
+        const hasTaken = allNodes.some(n =>
+          n.type === 'talent' && n.skillId === node.id && state.takenTalents.has(n.id));
+        if (hasTaken) return;
+        state.allocatedSkills.delete(node.id);
+        state.totalStars -= node.stars;
+      } else {
+        state.allocatedSkills.add(node.id);
+        state.totalStars += node.stars;
+      }
+    } else if (node.type === 'talent') {
+      if (!state.allocatedSkills.has(node.skillId)) return;
+      if (state.takenTalents.has(node.id)) {
+        // Untake
+        state.takenTalents.delete(node.id);
+        state.takenBySkillLevel.delete(node.levelKey);
+        state.totalStars--;
+      } else {
+        if (state.takenBySkillLevel.has(node.levelKey)) return; // blocked
+        state.takenTalents.add(node.id);
+        state.takenBySkillLevel.set(node.levelKey, node.id);
+        state.totalStars++;
+      }
+    }
+
+    applyState();
+    if (node.type !== 'talent') showInfo(node);
+  }
+
+  // ── Apply visual state ────────────────────────────────────────────
+  function applyState() {
+    document.getElementById('star-count').textContent = state.totalStars;
+
+    allNodes.forEach(node => {
+      const el = nodeEls[node.id];
+      if (!el) return;
+      const circle = el.querySelector('circle');
+
+      if (node.type === 'profession') {
+        const hasAllocated = allNodes.some(n =>
+          n.type === 'skill' && n.professionId === node.id && state.allocatedSkills.has(n.id));
+        circle.setAttribute('stroke', hasAllocated ? '#58a6ff' : '#30363d');
+        circle.setAttribute('stroke-width', hasAllocated ? '2.5' : '2');
+
+      } else if (node.type === 'skill') {
+        const allocated = state.allocatedSkills.has(node.id);
+        circle.setAttribute('fill', allocated ? '#1c2128' : '#161b22');
+        circle.setAttribute('stroke', allocated ? '#3fb950' : '#30363d');
+        circle.setAttribute('stroke-width', allocated ? '2.5' : '2');
+
+      } else if (node.type === 'talent') {
+        const skillAllocated = state.allocatedSkills.has(node.skillId);
+        el.style.display = skillAllocated ? '' : 'none';
+        if (!skillAllocated) return;
+
+        const taken   = state.takenTalents.has(node.id);
+        const blocked = !taken && state.takenBySkillLevel.has(node.levelKey);
+        const color   = node.level === 6 ? '#58a6ff' : '#3fb950';
+
+        if (taken) {
+          circle.setAttribute('fill', color);
+          circle.setAttribute('stroke', color);
+          el.style.opacity = '1';
+        } else if (blocked) {
+          circle.setAttribute('fill', '#161b22');
+          circle.setAttribute('stroke', '#6e7681');
+          el.style.opacity = '0.3';
+        } else {
+          circle.setAttribute('fill', '#161b22');
+          circle.setAttribute('stroke', color);
+          el.style.opacity = '1';
+        }
+      }
+    });
+
+    allEdges.forEach(edge => {
+      const el = edgeEls[`${edge.from}→${edge.to}`];
+      if (!el) return;
+
+      if (edge.type === 'prof-skill') {
+        const allocated = state.allocatedSkills.has(edge.to);
+        el.setAttribute('stroke', allocated ? '#3fb950' : '#30363d');
+        el.setAttribute('stroke-width', allocated ? '2' : '1.5');
+
+      } else if (edge.type === 'skill-talent') {
+        const skillAlloc = state.allocatedSkills.has(edge.from);
+        el.style.display = skillAlloc ? '' : 'none';
+        if (!skillAlloc) return;
+        const taken = state.takenTalents.has(edge.to);
+        const color = edge.level === 6 ? '#58a6ff' : '#3fb950';
+        el.setAttribute('stroke', taken ? color : '#30363d');
+        el.setAttribute('stroke-width', taken ? '2' : '1');
+      }
+    });
+  }
+
+  // ── Info bar ──────────────────────────────────────────────────────
+  function showInfo(node) {
+    const el = document.getElementById('info-content');
+
+    if (node.type === 'profession') {
+      const count = allNodes.filter(n => n.type === 'skill' && n.professionId === node.id).length;
+      el.innerHTML =
+        `<div class="info-title">${node.name} <span style="color:#8b949e;font-size:.8rem">— Profession</span></div>` +
+        `<div class="info-detail">${count} skills</div>`;
+
+    } else if (node.type === 'skill') {
+      const allocated = state.allocatedSkills.has(node.id);
+      const hasTaken  = allNodes.some(n =>
+        n.type === 'talent' && n.skillId === node.id && state.takenTalents.has(n.id));
+      const status = allocated
+        ? `<span style="color:#3fb950">Allocated</span>`
+        : `<span style="color:#8b949e">Not allocated</span>`;
+      const hint = allocated
+        ? (hasTaken ? 'Remove taken talents first to deallocate' : 'Click to deallocate and refund stars')
+        : `Click to allocate — costs ${node.stars} star${node.stars !== 1 ? 's' : ''}`;
+      el.innerHTML =
+        `<div class="info-title">${node.name} <span style="color:#e3b341">★${node.stars}</span> — ${status}</div>` +
+        `<div class="info-detail">${node.professionName}</div>` +
+        `<div class="info-hint">${hint}</div>`;
+
+    }
+  }
+
+  // ── Reset ─────────────────────────────────────────────────────────
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    state.allocatedSkills.clear();
+    state.takenTalents.clear();
+    state.takenBySkillLevel.clear();
+    state.totalStars = 0;
+    applyState();
+    document.getElementById('info-content').innerHTML =
+      '<span class="info-empty">Reset. Hover a node to begin.</span>';
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────
+  fetch('professions.json')
+    .then(r => r.json())
+    .then(data => {
+      const { nodes, edges } = computeLayout(data.professions);
+      allNodes = nodes;
+      allEdges = edges;
+      nodes.forEach(n => nodeMap[n.id] = n);
+
+      // Center the tree
+      view.x = svg.clientWidth  / 2;
+      view.y = svg.clientHeight / 2;
+
+      renderTree();
+      applyTransform();
+      applyState();
+    })
+    .catch(err => {
+      document.getElementById('info-content').innerHTML =
+        `<span class="info-empty">Failed to load professions.json: ${err.message}</span>`;
+    });
+</script>
+</body>
+</html>

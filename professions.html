@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professions - White Tiger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        /* Profession accordion */
+        .profession {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .profession-header {
+            background: #0d1117;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .profession-header:hover {
+            background: #1c2128;
+        }
+
+        .profession-header h2 {
+            color: #58a6ff;
+            font-size: 1rem;
+            font-weight: normal;
+        }
+
+        .profession-header .meta {
+            color: #8b949e;
+            font-size: 0.8rem;
+        }
+
+        .profession-header .chevron {
+            color: #8b949e;
+            font-size: 0.75rem;
+            transition: transform 0.2s;
+        }
+
+        .profession.open .chevron {
+            transform: rotate(90deg);
+        }
+
+        .profession-body {
+            display: none;
+            padding: 16px;
+            gap: 12px;
+            flex-direction: column;
+        }
+
+        .profession.open .profession-body {
+            display: flex;
+        }
+
+        /* Skill card */
+        .skill-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .skill-header {
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .skill-name {
+            color: #c9d1d9;
+            font-size: 0.9rem;
+        }
+
+        .stars-badge {
+            color: #e3b341;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        /* Talent list */
+        .talent-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        }
+
+        .talent {
+            padding: 10px 14px;
+            border-bottom: 1px solid #21262d;
+            border-right: 1px solid #21262d;
+        }
+
+        .talent:hover {
+            background: #1c2128;
+        }
+
+        .talent-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .talent-name {
+            color: #c9d1d9;
+            font-size: 0.8rem;
+        }
+
+        .talent-level {
+            font-size: 0.7rem;
+            color: #8b949e;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .talent-level.level-3 {
+            color: #3fb950;
+        }
+
+        .talent-level.level-6 {
+            color: #58a6ff;
+        }
+
+        .talent-desc {
+            color: #8b949e;
+            font-size: 0.75rem;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Professions</h1>
+            <p>Playtest server — skill talents and star costs. Click a profession to expand.</p>
+        </header>
+        <div id="professions-container"></div>
+    </div>
+
+    <script>
+        const skillStars = {
+            "Gathering": 1,
+            "Hunting": 1,
+            "Logging": 1,
+            "Mining": 1,
+            "Basic Engineering": 2,
+            "Butchery": 2,
+            "Campfire Cooking": 2,
+            "Carpentry": 2,
+            "Farming": 2,
+            "Fertilizers": 2,
+            "Masonry": 2,
+            "Milling": 2,
+            "Painting": 2,
+            "Baking": 3,
+            "Blacksmith": 3,
+            "Cooking": 3,
+            "Glassworking": 3,
+            "Paper Milling": 3,
+            "Pottery": 3,
+            "Shipwright": 3,
+            "Smelting": 3,
+            "Tailoring": 3,
+            "Advanced Baking": 4,
+            "Advanced Cooking": 4,
+            "Advanced Smelting": 4,
+            "Electronics": 4,
+            "Mechanics": 4,
+            "Oil Drilling": 4,
+            "Advanced Masonry": 5,
+            "Composites": 5,
+            "Cutting Edge Cooking": 5,
+            "Industry": 5
+        };
+
+        const maxStars = 5;
+
+        function starStr(n) {
+            if (n === undefined) return '';
+            return '★'.repeat(n) + '☆'.repeat(maxStars - n);
+        }
+
+        fetch('professions.json')
+            .then(r => r.json())
+            .then(data => render(data.professions))
+            .catch(err => {
+                document.getElementById('professions-container').textContent = 'Failed to load professions.json: ' + err.message;
+            });
+
+        function render(professions) {
+            const container = document.getElementById('professions-container');
+
+            professions.forEach((prof, i) => {
+                const el = document.createElement('div');
+                el.className = 'profession' + (i === 0 ? ' open' : '');
+
+                const skillCount = prof.skills.length;
+                const talentCount = prof.skills.reduce((sum, s) => sum + s.talents.length, 0);
+
+                el.innerHTML = `
+                    <div class="profession-header">
+                        <h2>${prof.profession}</h2>
+                        <span class="meta">${skillCount} skill${skillCount !== 1 ? 's' : ''} &middot; ${talentCount} talent${talentCount !== 1 ? 's' : ''}</span>
+                        <span class="chevron">&#9658;</span>
+                    </div>
+                    <div class="profession-body">
+                        ${prof.skills.map(skill => renderSkill(skill)).join('')}
+                    </div>
+                `;
+
+                el.querySelector('.profession-header').addEventListener('click', () => {
+                    el.classList.toggle('open');
+                });
+
+                container.appendChild(el);
+            });
+        }
+
+        function renderSkill(skill) {
+            const stars = skillStars[skill.skill];
+            const starsHtml = stars !== undefined
+                ? `<span class="stars-badge" title="${stars} star${stars !== 1 ? 's' : ''}">${starStr(stars)}</span>`
+                : '';
+
+            const talentsHtml = skill.talents.map(t => {
+                const levelClass = t.level === 6 ? 'level-6' : 'level-3';
+                const levelLabel = `lvl ${t.level}`;
+                return `
+                    <div class="talent">
+                        <div class="talent-header">
+                            <span class="talent-name">${t.display_name}</span>
+                            <span class="talent-level ${levelClass}">${levelLabel}</span>
+                        </div>
+                        <div class="talent-desc">${t.description}</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="skill-card">
+                    <div class="skill-header">
+                        ${starsHtml}
+                        <span class="skill-name">${skill.skill}</span>
+                    </div>
+                    <div class="talent-list">
+                        ${talentsHtml}
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Stats - White Tiger</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        .error-banner {
+            background: #0d1117;
+            border-left: 3px solid #f85149;
+            border: 1px solid #6e3030;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #f85149;
+            display: none;
+        }
+
+        .chart-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-card h2 {
+            color: #c9d1d9;
+            font-size: 0.95rem;
+            font-weight: normal;
+            margin-bottom: 16px;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 300px;
+        }
+
+        .no-data {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: #6e7681;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Server Stats</h1>
+            <p>Median nutrition and housing values across servers over time.</p>
+        </header>
+
+        <div id="error-banner" class="error-banner"></div>
+
+        <div class="chart-card">
+            <h2>Median Nutrition Value</h2>
+            <div id="nutrition-wrap" class="chart-wrap">
+                <canvas id="nutrition-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h2>Median Housing Value</h2>
+            <div id="housing-wrap" class="chart-wrap">
+                <canvas id="housing-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SERVERS = [
+            { slug: 'white-tiger',    name: 'White Tiger',    color: '#c9d1d9' },
+            { slug: 'sea-otter',      name: 'Sea Otter',      color: '#58a6ff' },
+            { slug: 'coast-redwood',  name: 'Coast Redwood',  color: '#3fb950' },
+            { slug: 'dusky-robin',    name: 'Dusky Robin',    color: '#e3b341' },
+            { slug: 'giant-panda',    name: 'Giant Panda',    color: '#bc8cff' },
+        ];
+
+        const DATASETS = {
+            nutrition: 'MedianNutritionValueOfActiveCitizens',
+            housing:   'MedianHouseValueOfActiveCitizens',
+        };
+
+        async function fetchDataset(slug, dataSet) {
+            const url = `https://${slug}.play.eco/datasets/get?dataSet=${dataSet}`;
+            try {
+                const r = await fetch(url);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return await r.json();
+            } catch {
+                return null;
+            }
+        }
+
+        function formatDay(seconds) {
+            const d = seconds / 86400;
+            return Number.isInteger(d) ? `Day ${d}` : `Day ${d.toFixed(1)}`;
+        }
+
+        function buildChart(canvasId, wrapId, serverResults) {
+            const wrap = document.getElementById(wrapId);
+
+            const validResults = serverResults.filter(r => r.data !== null);
+            if (validResults.length === 0) {
+                wrap.innerHTML = '<div class="no-data">No data available</div>';
+                return;
+            }
+
+            // Build unified sorted label set (day values in seconds), capped at day 36
+            const MAX_SECONDS = 36 * 86400;
+            const allTimes = new Set();
+            validResults.forEach(({ data }) => data.Times.forEach(t => { if (t <= MAX_SECONDS) allTimes.add(t); }));
+            const sortedTimes = [...allTimes].sort((a, b) => a - b);
+            const labels = sortedTimes.map(formatDay);
+
+            const chartDatasets = validResults.map(({ server, data }) => {
+                const timeIndex = new Map(data.Times.map((t, i) => [t, i]));
+                const values = sortedTimes.map(t => {
+                    const i = timeIndex.get(t);
+                    return i !== undefined ? data.Values[i] : null;
+                });
+                return {
+                    label: server.name,
+                    data: values,
+                    borderColor: server.color,
+                    backgroundColor: server.color + '22',
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    tension: 0.3,
+                    spanGaps: true,
+                };
+            });
+
+            new Chart(document.getElementById(canvasId), {
+                type: 'line',
+                data: { labels, datasets: chartDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#c9d1d9',
+                                font: { family: 'Consolas, Menlo, Monaco, monospace', size: 12 },
+                                boxWidth: 14,
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#161b22',
+                            borderColor: '#30363d',
+                            borderWidth: 1,
+                            titleColor: '#c9d1d9',
+                            bodyColor: '#8b949e',
+                            callbacks: {
+                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) : 'N/A'}`,
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#8b949e',
+                                font: { family: 'Consolas, Menlo, Monaco, monospace', size: 11 },
+                                maxTicksLimit: 20,
+                            },
+                            grid: { color: '#21262d' },
+                            border: { color: '#30363d' },
+                        },
+                        y: {
+                            ticks: {
+                                color: '#8b949e',
+                                font: { family: 'Consolas, Menlo, Monaco, monospace', size: 11 },
+                            },
+                            grid: { color: '#21262d' },
+                            border: { color: '#30363d' },
+                            title: {
+                                display: true,
+                                text: 'Skill Points',
+                                color: '#6e7681',
+                                font: { family: 'Consolas, Menlo, Monaco, monospace', size: 11 },
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function main() {
+            const fetches = SERVERS.flatMap(server => [
+                fetchDataset(server.slug, DATASETS.nutrition).then(data => ({ server, key: 'nutrition', data })),
+                fetchDataset(server.slug, DATASETS.housing).then(data => ({ server, key: 'housing', data })),
+            ]);
+
+            const results = await Promise.all(fetches);
+
+            const failed = results.filter(r => r.data === null).map(r => r.server.name);
+            const uniqueFailed = [...new Set(failed)];
+            if (uniqueFailed.length > 0) {
+                const banner = document.getElementById('error-banner');
+                banner.textContent = `Could not load data for: ${uniqueFailed.join(', ')}`;
+                banner.style.display = 'block';
+            }
+
+            const nutritionResults = results.filter(r => r.key === 'nutrition');
+            const housingResults   = results.filter(r => r.key === 'housing');
+
+            buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults);
+            buildChart('housing-chart',   'housing-wrap',   housingResults);
+        }
+
+        main();
+    </script>
+</body>
+</html>

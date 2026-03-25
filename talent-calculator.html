@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Talent Calculator - White Tiger</title>
+  <script src="nav.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -21,7 +22,7 @@
     .header {
       background: #161b22;
       border-bottom: 1px solid #30363d;
-      padding: 10px 20px;
+      padding: 16px 20px;
       display: flex;
       align-items: center;
       gap: 20px;
@@ -38,6 +39,11 @@
     .star-counter {
       font-size: 0.9rem;
       color: #e3b341;
+      background: #21262d;
+      border: 1px solid #e3b341;
+      border-radius: 4px;
+      padding: 4px 10px;
+      flex-shrink: 0;
     }
 
     .reset-btn {
@@ -133,7 +139,7 @@
     #tooltip .tt-desc { color: #8b949e; }
   </style>
 </head>
-<body>
+<body data-layout="column">
 
 <div class="header">
   <h1>Talent Calculator</h1>

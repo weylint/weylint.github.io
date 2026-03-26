@@ -206,7 +206,7 @@
   // ── State ─────────────────────────────────────────────────────────
   const state = {
     allocatedSkills:   new Set(),   // skill name strings
-    takenTalents:      new Set(),   // talent.class strings
+    takenTalents:      new Map(),   // talent.class → count (1…maxTakes)
     takenBySkillLevel: new Map(),   // "skillId-level" → talentClass
     totalStars: 0
   };
@@ -286,7 +286,9 @@
   function showTooltip(node) {
     const color = node.level === 6 ? '#58a6ff' : '#3fb950';
     tooltip.innerHTML =
-      `<div class="tt-title">${node.name} <span style="color:${color};font-size:.75rem">lvl ${node.level}</span></div>` +
+      `<div class="tt-title">${node.name} <span style="color:${color};font-size:.75rem">lvl ${node.level}</span>` +
+        (node.maxTakes > 1 ? ` <span style="color:#6e7681;font-size:.7rem">max ×${node.maxTakes}</span>` : '') +
+      `</div>` +
       `<div class="tt-desc">${node.description}</div>`;
     tooltip.style.display = 'block';
     positionTooltip();
@@ -358,6 +360,7 @@
               level: lvl,
               levelKey: `${skill.skill}-${lvl}`,
               skillId: skill.skill,
+              maxTakes: t.max_takes || 1,
               x: R * Math.cos(ta),
               y: R * Math.sin(ta),
               r: 13
@@ -452,6 +455,11 @@
         });
       } else if (node.type === 'talent') {
         g.style.display = 'none';  // hidden until skill allocated
+        const countTxt = svgText(node.x, node.y + 4, '', {
+          'text-anchor': 'middle', 'font-size': '9', 'font-weight': 'bold',
+          'fill': '#0d1117', 'pointer-events': 'none', 'data-role': 'count'
+        });
+        g.appendChild(countTxt);
       }
 
       g.addEventListener('click', e => {
@@ -497,14 +505,21 @@ function svgText(x, y, content, attrs) {
       }
     } else if (node.type === 'talent') {
       if (!state.allocatedSkills.has(node.skillId)) return;
-      if (state.takenTalents.has(node.id)) {
-        // Untake
-        state.takenTalents.delete(node.id);
-        state.takenBySkillLevel.delete(node.levelKey);
-        state.totalStars--;
+      const count = state.takenTalents.get(node.id) || 0;
+      if (count > 0) {
+        if (count < node.maxTakes) {
+          // Stack one more
+          state.takenTalents.set(node.id, count + 1);
+          state.totalStars++;
+        } else {
+          // At max — clear all takes
+          state.takenTalents.delete(node.id);
+          state.takenBySkillLevel.delete(node.levelKey);
+          state.totalStars -= count;
+        }
       } else {
         if (state.takenBySkillLevel.has(node.levelKey)) return; // blocked
-        state.takenTalents.add(node.id);
+        state.takenTalents.set(node.id, 1);
         state.takenBySkillLevel.set(node.levelKey, node.id);
         state.totalStars++;
       }
@@ -540,7 +555,8 @@ function svgText(x, y, content, attrs) {
         el.style.display = skillAllocated ? '' : 'none';
         if (!skillAllocated) return;
 
-        const taken   = state.takenTalents.has(node.id);
+        const count   = state.takenTalents.get(node.id) || 0;
+        const taken   = count > 0;
         const blocked = !taken && state.takenBySkillLevel.has(node.levelKey);
         const color   = node.level === 6 ? '#58a6ff' : '#3fb950';
 
@@ -557,6 +573,9 @@ function svgText(x, y, content, attrs) {
           circle.setAttribute('stroke', color);
           el.style.opacity = '1';
         }
+
+        const countEl = el.querySelector('[data-role="count"]');
+        if (countEl) countEl.textContent = (node.maxTakes > 1 && count > 0) ? count : '';
       }
     });
 

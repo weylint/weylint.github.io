@@ -193,6 +193,17 @@
             font-size: 0.75rem;
             line-height: 1.4;
         }
+
+        .max-takes-badge {
+            color: #8b949e;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            padding: 1px 4px;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
@@ -301,9 +312,12 @@
                 const levelClass = Number(level) === 6 ? 'level-6' : 'level-3';
                 const talentsHtml = talents.map(t => {
                     const name = t.display_name.replace(/\s*:.*$/, '');
+                    const maxTakesBadge = (t.max_takes && t.max_takes > 1)
+                        ? `<span class="max-takes-badge">×${t.max_takes}</span>`
+                        : '';
                     return `
                         <div class="talent">
-                            <div class="talent-name">${name}</div>
+                            <div class="talent-name">${name}${maxTakesBadge}</div>
                             <div class="talent-desc">${t.description}</div>
                         </div>
                     `;

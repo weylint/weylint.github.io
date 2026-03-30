@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Stats - White Tiger</title>
+    <script src="nav.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        .error-banner {
+            background: #0d1117;
+            border: 1px solid #6e3030;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #f85149;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+        }
+
+        .loading .spinner {
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid #30363d;
+            border-top-color: #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .no-data {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+            font-size: 0.875rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        thead th {
+            background: #0d1117;
+            color: #8b949e;
+            font-weight: normal;
+            text-align: left;
+            padding: 10px 14px;
+            border: 1px solid #21262d;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #21262d;
+        }
+
+        tbody tr:hover {
+            background: #1c2128;
+        }
+
+        tbody td {
+            padding: 10px 14px;
+            border: 1px solid #21262d;
+            vertical-align: top;
+        }
+
+        .stat-name {
+            color: #c9d1d9;
+            white-space: nowrap;
+        }
+
+        .law-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .law-entry {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .state-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid;
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            flex-shrink: 0;
+        }
+
+        .law-name {
+            color: #c9d1d9;
+        }
+
+        .law-count {
+            color: #6e7681;
+            font-size: 0.8rem;
+        }
+
+        .empty {
+            color: #6e7681;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Custom Stats</h1>
+            <p>Custom stat tables written and read across all active laws.</p>
+        </header>
+
+        <div id="error-banner" class="error-banner"></div>
+        <div id="stats-container">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading&hellip;</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WRITE_RE = /record\s+custom\s+stat\s+['"]?(\w+)['"]?/gi;
+        const READ_RE  = /['"]?(\w+)['"]?\s+count\s+by\b/gi;
+
+        function stripTags(s) {
+            return (s || '').replace(/<[^>]+>/g, ' ');
+        }
+
+        function stateColor(state) {
+            if (state === 'Active')   return '#3fb950';
+            if (state === 'Proposed') return '#e3b341';
+            return '#6e7681';
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Group laws by name, return [{law, count}] sorted by name
+        function groupLaws(laws) {
+            const map = new Map();
+            for (const law of laws) {
+                if (!map.has(law.Name)) map.set(law.Name, { law, count: 0 });
+                map.get(law.Name).count++;
+            }
+            return [...map.values()].sort((a, b) => a.law.Name.localeCompare(b.law.Name));
+        }
+
+        function renderLawCell(laws) {
+            if (laws.length === 0) return '<span class="empty">—</span>';
+            const groups = groupLaws(laws);
+            const entries = groups.map(({ law, count }) => {
+                const color = stateColor(law.State);
+                const badge = `<span class="state-badge" style="color:${color};border-color:${color}22;background:${color}11">${escapeHtml(law.State)}</span>`;
+                const countHtml = count > 1 ? ` <span class="law-count">(${count})</span>` : '';
+                return `<div class="law-entry">${badge}<span class="law-name">${escapeHtml(law.Name)}</span>${countHtml}</div>`;
+            });
+            return `<div class="law-list">${entries.join('')}</div>`;
+        }
+
+        async function main() {
+            const container = document.getElementById('stats-container');
+            const banner    = document.getElementById('error-banner');
+
+            try {
+                const res  = await fetch('https://white-tiger.play.eco/api/v1/laws');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const laws = (await res.json()).filter(l => l.State !== 'Removed');
+
+                const statMap = new Map();
+                for (const law of laws) {
+                    const text = stripTags(law.Description);
+                    for (const m of text.matchAll(WRITE_RE)) {
+                        const key = m[1].toLowerCase();
+                        if (!statMap.has(key)) statMap.set(key, { name: m[1], writes: [], reads: [] });
+                        statMap.get(key).writes.push(law);
+                    }
+                    for (const m of text.matchAll(READ_RE)) {
+                        const key = m[1].toLowerCase();
+                        if (!statMap.has(key)) statMap.set(key, { name: m[1], writes: [], reads: [] });
+                        statMap.get(key).reads.push(law);
+                    }
+                }
+
+                const stats = [...statMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+                if (stats.length === 0) {
+                    container.innerHTML = '<div class="no-data">No custom stats found in any law.</div>';
+                    return;
+                }
+
+                const rows = stats.map(stat => `<tr>
+                    <td class="stat-name">${escapeHtml(stat.name)}</td>
+                    <td>${renderLawCell(stat.writes)}</td>
+                    <td>${renderLawCell(stat.reads)}</td>
+                </tr>`).join('');
+
+                container.innerHTML = `<table>
+                    <thead><tr>
+                        <th>Custom Stat</th>
+                        <th>Written By</th>
+                        <th>Read By</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+            } catch (err) {
+                banner.textContent = `Could not load laws: ${err.message}`;
+                banner.style.display = 'block';
+                container.innerHTML = '';
+            }
+        }
+
+        main();
+    </script>
+</body>
+</html>

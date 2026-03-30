@@ -14,7 +14,9 @@
     <a class="wt-nav-link" href="server-stats.html" data-page="server-stats.html">Server Stats</a>
     <a class="wt-nav-link wt-nav-external" href="https://weylint.github.io/ecoflow" target="_blank" rel="noopener">EcoFlow <span class="wt-nav-ext-icon">↗</span></a>
     <div class="wt-nav-section">White Tiger Law</div>
-    <a class="wt-nav-link" href="/wt-law/" data-page="/wt-law/">Constitution</a>
+    <a class="wt-nav-link" href="law.html?doc=server-rules" data-page="law.html?doc=server-rules">Server Rules</a>
+    <a class="wt-nav-link" href="law.html?doc=constitution" data-page="law.html?doc=constitution">Constitution</a>
+    <a class="wt-nav-link" href="law.html?doc=federal-law" data-page="law.html?doc=federal-law">Federal Law</a>
 </nav>`;
 
     const STYLES = `
@@ -100,12 +102,20 @@
 
         // Mark active link
         const currentPath = window.location.pathname;
+        const currentSearch = window.location.search;
         const currentFile = currentPath.split('/').pop() || '';
         document.querySelectorAll('.wt-nav-link[data-page]').forEach(a => {
             const page = a.dataset.page;
-            const isActive = page.includes('/')
-                ? currentPath.startsWith(page)
-                : page === currentFile;
+            let isActive;
+            if (page.includes('?')) {
+                const [pageFile, pageQuery] = page.split('?');
+                isActive = (pageFile === currentFile || currentPath.startsWith(pageFile))
+                           && currentSearch === '?' + pageQuery;
+            } else if (page.includes('/')) {
+                isActive = currentPath.startsWith(page);
+            } else {
+                isActive = page === currentFile;
+            }
             if (isActive) a.classList.add('wt-nav-active');
         });
     });

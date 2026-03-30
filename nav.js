@@ -13,6 +13,8 @@
     <div class="wt-nav-section">Server</div>
     <a class="wt-nav-link" href="server-stats.html" data-page="server-stats.html">Server Stats</a>
     <a class="wt-nav-link wt-nav-external" href="https://weylint.github.io/ecoflow" target="_blank" rel="noopener">EcoFlow <span class="wt-nav-ext-icon">↗</span></a>
+    <div class="wt-nav-section">White Tiger Law</div>
+    <a class="wt-nav-link" href="/wt-law/" data-page="/wt-law/">Constitution</a>
 </nav>`;
 
     const STYLES = `
@@ -97,9 +99,14 @@
         body.appendChild(content);
 
         // Mark active link
-        const currentFile = window.location.pathname.split('/').pop() || '';
+        const currentPath = window.location.pathname;
+        const currentFile = currentPath.split('/').pop() || '';
         document.querySelectorAll('.wt-nav-link[data-page]').forEach(a => {
-            if (a.dataset.page === currentFile) a.classList.add('wt-nav-active');
+            const page = a.dataset.page;
+            const isActive = page.includes('/')
+                ? currentPath.startsWith(page)
+                : page === currentFile;
+            if (isActive) a.classList.add('wt-nav-active');
         });
     });
 }());

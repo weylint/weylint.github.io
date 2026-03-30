@@ -90,7 +90,7 @@
     <div class="container">
         <header>
             <h1>Server Stats</h1>
-            <p>Median nutrition and housing values across servers over time.</p>
+            <p>Median nutrition, housing, and GDP values across servers over time.</p>
         </header>
 
         <div id="error-banner" class="error-banner"></div>
@@ -108,6 +108,15 @@
                 <canvas id="housing-chart"></canvas>
             </div>
         </div>
+
+        <!-- GDP chart disabled: endpoint returns no useful data
+        <div class="chart-card">
+            <h2>GDP</h2>
+            <div id="gdp-wrap" class="chart-wrap">
+                <canvas id="gdp-chart"></canvas>
+            </div>
+        </div>
+        -->
     </div>
 
     <script>
@@ -122,6 +131,7 @@
         const DATASETS = {
             nutrition: 'MedianNutritionValueOfActiveCitizens',
             housing:   'MedianHouseValueOfActiveCitizens',
+            gdp:       'GDP',
         };
 
         async function fetchDataset(slug, dataSet) {
@@ -140,7 +150,7 @@
             return Number.isInteger(d) ? `Day ${d}` : `Day ${d.toFixed(1)}`;
         }
 
-        function buildChart(canvasId, wrapId, serverResults) {
+        function buildChart(canvasId, wrapId, serverResults, yLabel = 'Value') {
             const wrap = document.getElementById(wrapId);
 
             const validResults = serverResults.filter(r => r.data !== null);
@@ -220,7 +230,7 @@
                             border: { color: '#30363d' },
                             title: {
                                 display: true,
-                                text: 'Skill Points',
+                                text: yLabel,
                                 color: '#6e7681',
                                 font: { family: 'Consolas, Menlo, Monaco, monospace', size: 11 },
                             }
@@ -234,6 +244,7 @@
             const fetches = SERVERS.flatMap(server => [
                 fetchDataset(server.slug, DATASETS.nutrition).then(data => ({ server, key: 'nutrition', data })),
                 fetchDataset(server.slug, DATASETS.housing).then(data => ({ server, key: 'housing', data })),
+                // fetchDataset(server.slug, DATASETS.gdp).then(data => ({ server, key: 'gdp', data })),
             ]);
 
             const results = await Promise.all(fetches);
@@ -249,8 +260,9 @@
             const nutritionResults = results.filter(r => r.key === 'nutrition');
             const housingResults   = results.filter(r => r.key === 'housing');
 
-            buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults);
-            buildChart('housing-chart',   'housing-wrap',   housingResults);
+            buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults, 'Skill Points');
+            buildChart('housing-chart',   'housing-wrap',   housingResults,   'Skill Points');
+            // buildChart('gdp-chart',    'gdp-wrap',       results.filter(r => r.key === 'gdp'), 'GDP');
         }
 
         main();

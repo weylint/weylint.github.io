@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laws - White Tiger</title>
+    <script src="nav.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        .error-banner {
+            background: #0d1117;
+            border: 1px solid #6e3030;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #f85149;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+        }
+
+        .loading .spinner {
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid #30363d;
+            border-top-color: #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .no-data {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+            font-size: 0.875rem;
+        }
+
+        .law-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+        }
+
+        .law-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+
+        .law-name {
+            color: #c9d1d9;
+            font-size: 0.95rem;
+        }
+
+        .state-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid;
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            flex-shrink: 0;
+        }
+
+        .law-creator {
+            color: #6e7681;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+
+        .law-user-desc {
+            color: #c9d1d9;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .law-desc-detail {
+            margin-top: 8px;
+        }
+
+        .law-desc-detail summary {
+            cursor: pointer;
+            color: #6e7681;
+            font-size: 0.8rem;
+            user-select: none;
+        }
+
+        .law-desc-detail summary:hover {
+            color: #8b949e;
+        }
+
+        .law-desc-body {
+            margin-top: 10px;
+            color: #8b949e;
+            font-size: 0.82rem;
+            line-height: 1.6;
+        }
+
+        /* Eco markup styles */
+        .eco-header {
+            color: #58a6ff;
+            font-size: 0.875rem;
+            font-weight: bold;
+            margin: 12px 0 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .eco-header:first-child { margin-top: 0; }
+        .eco-govt     { color: #e3b341; }
+        .eco-currency { color: #3fb950; }
+        .eco-bank     { color: #58a6ff; }
+        .eco-positive { color: #3fb950; }
+
+        .eco-foldout {
+            position: relative;
+            display: inline-block;
+        }
+
+        .eco-foldout-label {
+            color: #58a6ff;
+            font-size: 0.8em;
+            border-bottom: 1px dotted #58a6ff;
+            cursor: default;
+        }
+
+        .eco-foldout-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 0;
+            z-index: 100;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px 12px;
+            min-width: 180px;
+            max-width: 400px;
+            font-size: 0.8rem;
+            color: #8b949e;
+            line-height: 1.8;
+            white-space: normal;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+
+        .eco-foldout:hover .eco-foldout-tooltip {
+            display: block;
+        }
+
+        .eco-line         { line-height: 1.7; }
+        .eco-line-indent  { padding-left: 1.5em; }
+        .eco-line-block   { margin-top: 0.8em; }
+        .eco-spacer       { height: 0.4em; }
+
+        .eco-chip {
+            display: inline-block;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 3px;
+            padding: 1px 6px;
+            font-size: 0.8em;
+            color: #c9d1d9;
+            margin: 0 1px;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Laws</h1>
+            <p>Active and proposed laws on the White Tiger server.</p>
+        </header>
+
+        <div id="error-banner" class="error-banner"></div>
+        <div id="laws-container">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading laws&hellip;</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STATE_ORDER = { 'Active': 0, 'Proposed': 1 };
+
+        function stateColor(state) {
+            if (state === 'Active')   return '#3fb950';
+            if (state === 'Proposed') return '#e3b341';
+            return '#6e7681';
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function formatEcoText(raw) {
+            if (!raw) return '';
+            let s = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            let prev;
+            let passes = 0;
+            do {
+                prev = s;
+                s = s
+                    // Foldout → tooltip (replace \n in body immediately so line-by-line doesn't break it)
+                    .replace(/<foldout><linktext>([\s\S]*?)<\/linktext><title>[\s\S]*?<\/title>([\s\S]*?)<\/foldout>/g,
+                        (_, sum, body) => `<span class="eco-foldout"><span class="eco-foldout-label">${sum}</span><span class="eco-foldout-tooltip">${body.trim().replace(/\n/g, '<br>')}</span></span>`)
+                    // Chip: link > icon > color > text
+                    .replace(/<link="[^"]*"><icon[^>]*><color=#([0-9A-Fa-f]{6})[0-9A-Fa-f]{0,2}>([\s\S]*?)<\/color><\/icon><\/link>/g,
+                        (_, rgb, text) => `<span class="eco-chip" style="color:#${rgb}">${text}</span>`)
+                    // Chip: link > icon > text (no color)
+                    .replace(/<link="[^"]*"><icon[^>]*>([\s\S]*?)<\/icon><\/link>/g,
+                        (_, text) => `<span class="eco-chip">${text}</span>`)
+                    // Fallback: bare link / icon
+                    .replace(/<link="[^"]*">([\s\S]*?)<\/link>/g, '$1')
+                    .replace(/<icon[^>]*>([\s\S]*?)<\/icon>/g, '$1')
+                    // Named styles
+                    .replace(/<style="Header">([\s\S]*?)<\/style>/g, '<div class="eco-header">$1</div>')
+                    .replace(/<style="Government">([\s\S]*?)<\/style>/g, '<span class="eco-govt">$1</span>')
+                    .replace(/<style="Currency">([\s\S]*?)<\/style>/g, '<span class="eco-currency">$1</span>')
+                    .replace(/<style="BankAccount">([\s\S]*?)<\/style>/g, '<span class="eco-bank">$1</span>')
+                    .replace(/<style="Positive">([\s\S]*?)<\/style>/g, '<span class="eco-positive">$1</span>')
+                    .replace(/<style="[^"]*">([\s\S]*?)<\/style>/g, '$1');
+            } while (s !== prev && ++passes < 10);
+
+            // Remaining color tags
+            s = s.replace(/<color=#([0-9A-Fa-f]{6})[0-9A-Fa-f]{0,2}>/g, '<span style="color:#$1">');
+            s = s.replace(/<\/color>/g, '</span>');
+
+            // Preserve newlines inside <i> blocks (section explanations) as <br>
+            // so the line-by-line split doesn't break mid-tag
+            s = s.replace(/<i>([\s\S]*?)<\/i>/g, (_, c) => `<i>${c.replace(/\n/g, '<br>')}</i>`);
+
+            // Line-by-line: preserve indentation and add block spacing
+            const htmlLines = s.split('\n').map(line => {
+                const trimmed = line.trimStart();
+                if (!trimmed) return '<div class="eco-spacer"></div>';
+                // Block starters are never indented regardless of leading whitespace
+                const isBlock = /^(on\s+event|on\s+every|then|else\s+if|else)\b/i.test(trimmed);
+                const isIndented = !isBlock && line.length > trimmed.length;
+                const classes = 'eco-line'
+                    + (isIndented ? ' eco-line-indent' : '')
+                    + (isBlock    ? ' eco-line-block'  : '');
+                return `<div class="${classes}">${trimmed}</div>`;
+            });
+            return htmlLines.join('\n');
+        }
+
+        function renderLaw(law) {
+            const color = stateColor(law.State);
+            const userDesc = law.UserDescription
+                ? `<div class="law-user-desc">${formatEcoText(law.UserDescription)}</div>`
+                : '';
+            const desc = law.Description
+                ? `<details class="law-desc-detail">
+                       <summary>Full law text</summary>
+                       <div class="law-desc-body">${formatEcoText(law.Description)}</div>
+                   </details>`
+                : '';
+            return `
+                <div class="law-card">
+                    <div class="law-header">
+                        <span class="state-badge" style="color:${color};border-color:${color}22;background:${color}11">${escapeHtml(law.State)}</span>
+                        <span class="law-name">${escapeHtml(law.Name)}</span>
+                    </div>
+                    <div class="law-creator">by ${escapeHtml(law.Creator)}</div>
+                    ${userDesc}${desc}
+                </div>
+            `;
+        }
+
+        async function main() {
+            const container = document.getElementById('laws-container');
+            const banner = document.getElementById('error-banner');
+
+            try {
+                const res = await fetch('https://white-tiger.play.eco/api/v1/laws');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const laws = await res.json();
+
+                const visible = laws
+                    .filter(l => l.State !== 'Removed')
+                    .sort((a, b) => {
+                        const oa = STATE_ORDER[a.State] ?? 99;
+                        const ob = STATE_ORDER[b.State] ?? 99;
+                        if (oa !== ob) return oa - ob;
+                        return a.Name.localeCompare(b.Name);
+                    });
+
+                if (visible.length === 0) {
+                    container.innerHTML = '<div class="no-data">No active or proposed laws.</div>';
+                    return;
+                }
+
+                container.innerHTML = visible.map(renderLaw).join('');
+            } catch (err) {
+                banner.textContent = `Could not load laws: ${err.message}`;
+                banner.style.display = 'block';
+                container.innerHTML = '';
+            }
+        }
+
+        main();
+    </script>
+</body>
+</html>

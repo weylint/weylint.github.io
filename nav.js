@@ -14,6 +14,7 @@
     <a class="wt-nav-link" href="server-stats.html" data-page="server-stats.html">Server Stats</a>
     <a class="wt-nav-link wt-nav-external" href="https://weylint.github.io/ecoflow" target="_blank" rel="noopener">EcoFlow <span class="wt-nav-ext-icon">↗</span></a>
     <div class="wt-nav-section">White Tiger Law</div>
+    <a class="wt-nav-link" href="laws.html" data-page="laws.html">Laws</a>
     <a class="wt-nav-link" href="law.html?doc=server-rules" data-page="law.html?doc=server-rules">Server Rules</a>
     <a class="wt-nav-link" href="law.html?doc=constitution" data-page="law.html?doc=constitution">Constitution</a>
     <a class="wt-nav-link" href="law.html?doc=federal-law" data-page="law.html?doc=federal-law">Federal Law</a>

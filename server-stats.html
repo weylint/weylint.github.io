@@ -90,7 +90,7 @@
     <div class="container">
         <header>
             <h1>Server Stats</h1>
-            <p>Median nutrition, housing, and GDP values across servers over time.</p>
+            <p>Median nutrition, housing, and average actions-per-citizen values across servers over time.</p>
         </header>
 
         <div id="error-banner" class="error-banner"></div>
@@ -106,6 +106,13 @@
             <h2>Median Housing Value</h2>
             <div id="housing-wrap" class="chart-wrap">
                 <canvas id="housing-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h2>Actions per Hour</h2>
+            <div id="actions-wrap" class="chart-wrap">
+                <canvas id="actions-chart"></canvas>
             </div>
         </div>
 
@@ -131,6 +138,7 @@
         const DATASETS = {
             nutrition: 'MedianNutritionValueOfActiveCitizens',
             housing:   'MedianHouseValueOfActiveCitizens',
+            play:      'Play',
             gdp:       'GDP',
         };
 
@@ -244,6 +252,7 @@
             const fetches = SERVERS.flatMap(server => [
                 fetchDataset(server.slug, DATASETS.nutrition).then(data => ({ server, key: 'nutrition', data })),
                 fetchDataset(server.slug, DATASETS.housing).then(data => ({ server, key: 'housing', data })),
+                fetchDataset(server.slug, DATASETS.play).then(data => ({ server, key: 'play', data })),
                 // fetchDataset(server.slug, DATASETS.gdp).then(data => ({ server, key: 'gdp', data })),
             ]);
 
@@ -259,9 +268,11 @@
 
             const nutritionResults = results.filter(r => r.key === 'nutrition');
             const housingResults   = results.filter(r => r.key === 'housing');
+            const playResults      = results.filter(r => r.key === 'play');
 
             buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults, 'Skill Points');
             buildChart('housing-chart',   'housing-wrap',   housingResults,   'Skill Points');
+            buildChart('actions-chart',   'actions-wrap',   playResults,      'Actions per Hour');
             // buildChart('gdp-chart',    'gdp-wrap',       results.filter(r => r.key === 'gdp'), 'GDP');
         }
 

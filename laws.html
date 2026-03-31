@@ -141,7 +141,7 @@
             border-top: 1px solid #30363d;
             border-bottom: 1px solid #30363d;
             border-radius: 0;
-            padding: 12px 0;
+            padding: 12px 0 12px 16px;
             margin-top: 10px;
             /* Escape the 900px container: shift left past card padding + container auto-margin,
                then span the full .wt-content inner width (viewport - 220px nav - 40px padding). */
@@ -167,6 +167,7 @@
         .eco-currency { color: #3fb950; }
         .eco-bank     { color: #58a6ff; }
         .eco-positive { color: #3fb950; }
+        .eco-comment  { color: #6a9955; font-style: italic; }
 
         .eco-foldout {
             position: relative;
@@ -308,11 +309,8 @@
             s = s.replace(/<color=#([0-9A-Fa-f]{6})[0-9A-Fa-f]{0,2}>/g, '<span style="color:#$1">');
             s = s.replace(/<\/color>/g, '</span>');
 
-            // Preserve newlines inside <i> blocks (section explanations) as <br>
-            // so the line-by-line split doesn't break mid-tag
-            s = s.replace(/<i>([\s\S]*?)<\/i>/g, (_, c) => `<i>${c.replace(/\n/g, '<br>')}</i>`);
-
             // Stash <i> blocks before splitting so their text isn't treated as law code
+            // (newlines are left as-is; unstash step converts them to // comment lines)
             const savedIBlocks = [];
             s = s.replace(/<i>[\s\S]*?<\/i>/gi, m => { savedIBlocks.push(m); return `\x00I${savedIBlocks.length - 1}\x00`; });
 
@@ -322,8 +320,12 @@
             s = s.replace(/\belse\s*\n\s*if\b/gi, 'else if');
             s = s.replace(/\band\s*\n\s*if\b/gi, 'and if');
 
-            // Restore <i> blocks
-            s = s.replace(/\x00I(\d+)\x00/g, (_, i) => savedIBlocks[+i]);
+            // Restore <i> blocks as // comment lines so they enter the line numbering system
+            s = s.replace(/\x00I(\d+)\x00/g, (_, i) =>
+                savedIBlocks[+i].replace(/^<i>([\s\S]*?)<\/i>$/i, (_, c) =>
+                    '\n// ' + c.trim().replace(/\n\s*/g, '\n// ') + '\n'
+                )
+            );
 
             // Line-by-line: stateful depth tracker for if/then hierarchy
             let lineNum = 0;
@@ -344,6 +346,7 @@
                     /^if\b/i.test(trimmed)                 ? 'if'     :
                     /^then\b/i.test(trimmed)               ? 'then'   :
                     /^(and|or|not)\b/i.test(trimmed)       ? 'andor'  :
+                    /^\/\//.test(trimmed)                  ? 'comment':
                     null;
 
                 if      (kw === 'on')                                { depth = 0; }
@@ -355,7 +358,7 @@
 
                 // 'andif' acts like 'if' for subsequent 'then' depth decisions
                 // 'andor' records itself so a following 'if' knows not to go deeper
-                if (kw) lastKw = kw === 'andif' ? 'if' : kw;
+                if (kw && kw !== 'comment') lastKw = kw === 'andif' ? 'if' : kw;
 
                 // Lines indented in the raw text (e.g. action content directly under 'on event')
                 // get a line number and at least depth 1 even when no keyword set the depth.
@@ -363,12 +366,14 @@
                 const showLineNum = kw !== null || isIndented;
                 if (showLineNum) lineNum++;
 
-                const content = trimmed
-                    .replace(/^(on\s+event|on\s+every)\b/i,  '<span class="eco-kw-event">$1</span>')
-                    .replace(/^(then)\b/i,                    '<span class="eco-kw-then">$1</span>')
-                    .replace(/^(else\s+if|and\s+if|if)\b/i,   '<span class="eco-kw-cond">$1</span>')
-                    .replace(/^(else)\b/i,                    '<span class="eco-kw-cond">$1</span>')
-                    .replace(/^(and|or|not)\b/i,              '<span class="eco-kw-op">$1</span>');
+                const content = kw === 'comment'
+                    ? `<span class="eco-comment">${trimmed}</span>`
+                    : trimmed
+                        .replace(/^(on\s+event|on\s+every)\b/i,  '<span class="eco-kw-event">$1</span>')
+                        .replace(/^(then)\b/i,                    '<span class="eco-kw-then">$1</span>')
+                        .replace(/^(else\s+if|and\s+if|if)\b/i,   '<span class="eco-kw-cond">$1</span>')
+                        .replace(/^(else)\b/i,                    '<span class="eco-kw-cond">$1</span>')
+                        .replace(/^(and|or|not)\b/i,              '<span class="eco-kw-op">$1</span>');
 
                 const lnHtml = showLineNum
                     ? `<span class="eco-ln">${lineNum}</span>`

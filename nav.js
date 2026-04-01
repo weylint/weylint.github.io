@@ -6,6 +6,7 @@
     <a class="wt-nav-link" href="skills.html" data-page="skills.html">Skills</a>
     <a class="wt-nav-link" href="professions.html" data-page="professions.html">Professions</a>
     <a class="wt-nav-link" href="talent-calculator.html" data-page="talent-calculator.html">Talent Calculator</a>
+    <a class="wt-nav-link" href="star-estimate.html" data-page="star-estimate.html">Star Estimate</a>
     <div class="wt-nav-section">Economy</div>
     <a class="wt-nav-link" href="meteorstore.html" data-page="meteorstore.html">Meteor Store</a>
     <a class="wt-nav-link" href="transport.html" data-page="transport.html">Transport</a>

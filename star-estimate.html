@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Estimate - White Tiger</title>
+    <script src="nav.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        .inputs-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 2fr;
+            gap: 16px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-group label {
+            color: #8b949e;
+            font-size: 0.78rem;
+        }
+
+        .input-group input {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 8px 10px;
+            color: #c9d1d9;
+            font-family: inherit;
+            font-size: 0.875rem;
+            width: 100%;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+
+        .input-hint {
+            color: #6e7681;
+            font-size: 0.72rem;
+        }
+
+        .example-note {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 10px 14px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+        }
+
+        .example-label {
+            color: #6e7681;
+            font-size: 0.78rem;
+            flex-shrink: 0;
+        }
+
+        .example-img {
+            height: 24px;
+            image-rendering: auto;
+            border-radius: 3px;
+        }
+
+        .example-caption {
+            color: #6e7681;
+            font-size: 0.78rem;
+        }
+
+        .params-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        .params-card h2 {
+            color: #8b949e;
+            font-size: 0.8rem;
+            font-weight: normal;
+            margin-bottom: 12px;
+        }
+
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        .param-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .param-item label {
+            color: #6e7681;
+            font-size: 0.72rem;
+        }
+
+        .param-item input {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 4px;
+            padding: 6px 8px;
+            color: #8b949e;
+            font-family: inherit;
+            font-size: 0.8rem;
+            width: 100%;
+        }
+
+        .param-item input:focus {
+            outline: none;
+            border-color: #30363d;
+            color: #c9d1d9;
+        }
+
+        .table-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .table-card h2 {
+            color: #c9d1d9;
+            font-size: 0.9rem;
+            font-weight: normal;
+            padding: 14px 16px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        thead th {
+            background: #0d1117;
+            color: #8b949e;
+            font-weight: normal;
+            text-align: left;
+            padding: 8px 14px;
+            border-bottom: 1px solid #21262d;
+            white-space: nowrap;
+        }
+
+        thead th.th-right {
+            text-align: right;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #21262d;
+        }
+
+        tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: #1c2128;
+        }
+
+        tbody tr.current-day {
+            background: #58a6ff0d;
+        }
+
+        tbody tr.current-day:hover {
+            background: #58a6ff18;
+        }
+
+        tbody td {
+            padding: 7px 14px;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        tbody td.td-right {
+            text-align: right;
+        }
+
+        .td-eod     { color: #3fb950; }
+        .td-weekday { color: #8b949e; }
+        .td-skill   { color: #c9d1d9; }
+        .td-muted   { color: #6e7681; }
+
+        .unlock-chip {
+            display: inline-block;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-size: 0.75em;
+            color: #8b949e;
+            margin-right: 2px;
+        }
+
+        .arrow-current {
+            color: #58a6ff;
+            font-size: 0.75rem;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Star Estimate</h1>
+            <p>Projected star level at end of each game day.</p>
+        </header>
+
+        <div class="inputs-card">
+            <div class="input-group">
+                <label>Current Level (stars)</label>
+                <input type="number" id="current-level" value="1" min="1" step="1" placeholder="e.g. 3.5">
+                <span class="input-hint">Next to Stars</span>
+            </div>
+            <div class="input-group">
+                <label>XP Multiplier</label>
+                <input type="number" id="xp-multiplier" value="" min="0" step="0.1" placeholder="e.g. 248">
+                <span class="input-hint">XP Mult from Food+House</span>
+            </div>
+            <div class="input-group">
+                <label>Day + Time</label>
+                <input type="text" id="day-time" value="" placeholder="e.g. Day 4, 10:00  or  4,10:00  or  4">
+                <span class="input-hint">From ingame /time now</span>
+            </div>
+        </div>
+
+        <div class="example-note">
+            <span class="example-label">e.g.</span>
+            <img src="example-star.png" alt="Game UI example: 9 stars, x247.3 XP multiplier" class="example-img">
+            <span class="example-caption">→ Current Level: 9.5 &nbsp;·&nbsp; XP Multiplier: 247.3</span>
+        </div>
+
+        <div class="params-card">
+            <h2>Formula parameters <span style="color:#6e7681;font-size:0.75em">(don't touch, unless you know what you're doing)</span></h2>
+            <div class="params-grid">
+                <div class="param-item">
+                    <label>Experience Difficulty Modifier</label>
+                    <input type="number" id="p-edm" value="1" step="0.01">
+                </div>
+                <div class="param-item">
+                    <label>Percent Multiplier (%)</label>
+                    <input type="number" id="p-pm" value="108" step="0.1">
+                </div>
+                <div class="param-item">
+                    <label>Base Cost</label>
+                    <input type="number" id="p-bc" value="13" step="0.1">
+                </div>
+                <div class="param-item">
+                    <label>Stars Required per Stage</label>
+                    <input type="number" id="p-srps" value="4" step="1" min="1">
+                </div>
+                <div class="param-item">
+                    <label>Experience Increased Additive</label>
+                    <input type="number" id="p-eia" value="5" step="0.1">
+                </div>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <h2>Stars by day</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th class="th-right">End of Day</th>
+                        <th>Weekday</th>
+                        <th>Skill 1</th>
+                        <th>Skill 2</th>
+                        <th>Unlock</th>
+                    </tr>
+                </thead>
+                <tbody id="day-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const MAX_STAGES = 60;
+        const MIN_END_DAY = 40;
+
+        const WEEKDAYS = ['Friday','Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'];
+
+        const SCHEDULE = {
+             0: { skill1: 'Farming',           skill2: 'Butchery',        unlock: 'BU1'     },
+             1: { skill1: 'Masonry',           skill2: 'Carpentry',       unlock: ''        },
+             2: { skill1: 'Shipwright',        skill2: 'Basic Engineer',  unlock: 'BU2'     },
+             3: { skill1: 'Tailoring',         skill2: 'Milling',         unlock: ''        },
+             4: { skill1: 'Smelting',          skill2: 'Fertilizers',     unlock: 'BU3 AU1' },
+             5: { skill1: 'Blacksmith',        skill2: '',                unlock: ''        },
+             6: { skill1: 'Pottery',           skill2: '',                unlock: 'BU4'     },
+             7: { skill1: 'Glassworking',      skill2: 'Painting',        unlock: ''        },
+             8: { skill1: 'Cooking',           skill2: 'Baking',          unlock: 'AU2'     },
+             9: { skill1: '',                  skill2: '',                unlock: ''        },
+            10: { skill1: 'Mechanics',         skill2: 'Paper Milling',   unlock: 'AU3'     },
+            11: { skill1: '',                  skill2: '',                unlock: ''        },
+            12: { skill1: 'Advanced Smelting', skill2: '',                unlock: 'AU4 MU1' },
+            13: { skill1: '',                  skill2: '',                unlock: ''        },
+            14: { skill1: 'Advanced Cooking',  skill2: 'Advanced Bakery', unlock: ''        },
+            15: { skill1: 'Electronics',       skill2: '',                unlock: 'MU2'     },
+            16: { skill1: '',                  skill2: '',                unlock: ''        },
+            17: { skill1: 'Industry',          skill2: 'Oil Drilling',    unlock: 'MU3'     },
+            18: { skill1: '',                  skill2: '',                unlock: ''        },
+            19: { skill1: 'Advanced Masonry',  skill2: 'Composites',      unlock: 'MU4'     },
+            20: { skill1: '',                  skill2: '',                unlock: ''        },
+        };
+
+        function getParams() {
+            return {
+                edm:  parseFloat(document.getElementById('p-edm').value)  || 1,
+                pm:   (parseFloat(document.getElementById('p-pm').value)   || 108) / 100,
+                bc:   parseFloat(document.getElementById('p-bc').value)   || 13,
+                srps: parseInt(document.getElementById('p-srps').value)   || 4,
+                eia:  parseFloat(document.getElementById('p-eia').value)  || 5,
+            };
+        }
+
+        function buildXpTable(p, count) {
+            const table = [];
+            let prev = p.edm * p.pm * p.bc;
+            table.push(prev);
+            for (let x = 1; x < count; x++) {
+                prev = prev * p.pm + p.eia * Math.floor((x + 1) / p.srps);
+                table.push(prev);
+            }
+            return table;
+        }
+
+        // Accepts: "Day 4, 10:00" / "4,10:00" / "4 10:00" / "4" → total hours
+        function parseCurrentTime(str) {
+            if (!str || !str.trim()) return null;
+            str = str.trim();
+
+            let day = 0;
+            const dayWordMatch    = str.match(/^day\s*(\d+)/i);
+            const leadingDayMatch = !dayWordMatch && str.match(/^(\d+)(?!:)/);
+
+            if (dayWordMatch)        day = parseInt(dayWordMatch[1]);
+            else if (leadingDayMatch) day = parseInt(leadingDayMatch[1]);
+
+            const timeMatch = str.match(/(\d{1,2}):(\d{2})/);
+            const hours     = timeMatch ? parseInt(timeMatch[1]) + parseInt(timeMatch[2]) / 60 : 0;
+
+            if (!dayWordMatch && !leadingDayMatch && !timeMatch) return null;
+            return day * 24 + hours;
+        }
+
+        function starsAfterXp(currentStage, remainingInCurrent, progress, xpGained, xpTable) {
+            if (xpGained < remainingInCurrent) {
+                return currentStage + 1 + progress + xpGained / xpTable[currentStage];
+            }
+            let xp = xpGained - remainingInCurrent;
+            let stage = currentStage + 1;
+            while (stage < xpTable.length && xp >= xpTable[stage]) {
+                xp -= xpTable[stage];
+                stage++;
+            }
+            const fraction = stage < xpTable.length ? xp / xpTable[stage] : 0;
+            return stage + 1 + fraction;
+        }
+
+        function unlockHtml(str) {
+            if (!str) return '<span class="td-muted">—</span>';
+            return str.split(' ').map(t => `<span class="unlock-chip">${t}</span>`).join('');
+        }
+
+        function _render() {
+            const p = getParams();
+            const currentLevel  = Math.max(1, parseFloat(document.getElementById('current-level').value) || 1);
+            const xpPerDay      = parseFloat(document.getElementById('xp-multiplier').value) || 0;
+            const currentTime   = parseCurrentTime(document.getElementById('day-time').value);
+
+            const internalLevel      = currentLevel - 1;
+            const currentStage       = Math.floor(internalLevel);
+            const progress           = internalLevel - currentStage;
+            const xpTable            = buildXpTable(p, MAX_STAGES);
+            const remainingInCurrent = (1 - progress) * xpTable[currentStage];
+
+            const currentDay          = currentTime !== null ? Math.floor(currentTime / 24) : 0;
+            const hoursRemainingToday = currentTime !== null ? ((currentDay + 1) * 24 - currentTime) : 24;
+            const xpToday             = hoursRemainingToday * (xpPerDay / 24);
+
+            const numRows = Math.max(14, MIN_END_DAY - currentDay + 1);
+
+            const tbody = document.getElementById('day-table-body');
+            let rows = '';
+            let cumulativeXp = 0;
+
+            for (let d = 0; d < numRows; d++) {
+                cumulativeXp += d === 0 ? xpToday : xpPerDay;
+
+                const dayNum   = currentDay + d;
+                const dayLabel = currentTime !== null ? `Day ${dayNum}` : `Day ${d}`;
+                const isToday  = d === 0 && currentTime !== null;
+                const arrow    = isToday ? `<span class="arrow-current">▶</span>` : '';
+
+                let eodHtml = '<span class="td-muted">—</span>';
+                if (xpPerDay > 0) {
+                    const stars = starsAfterXp(currentStage, remainingInCurrent, progress, cumulativeXp, xpTable);
+                    eodHtml = `<span class="td-eod">${stars.toFixed(2)}★</span>`;
+                }
+
+                const sched   = SCHEDULE[dayNum] ?? { skill1: '', skill2: '', unlock: '' };
+                const weekday = WEEKDAYS[dayNum % 7];
+
+                const skill1Html  = sched.skill1 ? `<span class="td-skill">${sched.skill1}</span>` : '<span class="td-muted">—</span>';
+                const skill2Html  = sched.skill2 ? `<span class="td-skill">${sched.skill2}</span>` : '<span class="td-muted">—</span>';
+
+                rows += `<tr class="${isToday ? 'current-day' : ''}">
+                    <td>${arrow}${dayLabel}</td>
+                    <td class="td-right">${eodHtml}</td>
+                    <td class="td-weekday">${weekday}</td>
+                    <td>${skill1Html}</td>
+                    <td>${skill2Html}</td>
+                    <td>${unlockHtml(sched.unlock)}</td>
+                </tr>`;
+            }
+
+            tbody.innerHTML = rows;
+        }
+
+        function loadFromUrl() {
+            const p = new URLSearchParams(location.search);
+            if (p.has('level')) document.getElementById('current-level').value = p.get('level');
+            if (p.has('xp'))    document.getElementById('xp-multiplier').value = p.get('xp');
+            if (p.has('time'))  document.getElementById('day-time').value       = p.get('time');
+        }
+
+        function updateUrl() {
+            const level = document.getElementById('current-level').value;
+            const xp    = document.getElementById('xp-multiplier').value;
+            const time  = document.getElementById('day-time').value;
+            const p = new URLSearchParams();
+            if (level) p.set('level', level);
+            if (xp)    p.set('xp',    xp);
+            if (time)  p.set('time',  time);
+            const qs = p.toString();
+            history.replaceState(null, '', qs ? '?' + qs : location.pathname);
+        }
+
+        function render() {
+            updateUrl();
+            _render();
+        }
+
+        document.querySelectorAll('input').forEach(el => el.addEventListener('input', render));
+
+        loadFromUrl();
+        render();
+    </script>
+</body>
+</html>

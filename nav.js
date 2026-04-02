@@ -76,6 +76,69 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+.wt-mobile-bar {
+    display: none;
+}
+.wt-nav-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+}
+.wt-nav-overlay.wt-nav-overlay-open {
+    display: block;
+}
+@media (max-width: 767px) {
+    .wt-mobile-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: 48px;
+        background: #161b22;
+        border-bottom: 1px solid #30363d;
+        padding: 0 16px;
+        z-index: 101;
+        font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+    }
+    .wt-mobile-bar-title {
+        color: #58a6ff;
+        font-size: 1rem;
+    }
+    .wt-hamburger {
+        background: none;
+        border: 1px solid #30363d;
+        color: #8b949e;
+        font-size: 1.1rem;
+        line-height: 1;
+        padding: 4px 8px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-family: inherit;
+    }
+    .wt-hamburger:hover {
+        border-color: #58a6ff;
+        color: #58a6ff;
+    }
+    .wt-nav {
+        position: fixed;
+        top: 0; left: 0;
+        height: 100vh;
+        width: 220px;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+    }
+    .wt-nav.wt-nav-open {
+        transform: translateX(0);
+    }
+    .wt-content,
+    .wt-content-column {
+        padding-top: calc(48px + 20px);
+    }
 }`;
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -91,10 +154,39 @@
         // Snapshot existing children
         const children = Array.from(body.childNodes);
 
+        // Mobile top bar
+        const mobileBar = document.createElement('div');
+        mobileBar.className = 'wt-mobile-bar';
+        mobileBar.innerHTML = '<button class="wt-hamburger" aria-label="Men\u00fc \u00f6ffnen">&#9776;</button><span class="wt-mobile-bar-title">White Tiger</span>';
+        body.insertBefore(mobileBar, body.firstChild);
+
         // Inject nav
         const navWrapper = document.createElement('div');
         navWrapper.innerHTML = NAV_HTML;
         body.insertBefore(navWrapper.firstElementChild, body.firstChild);
+
+        // Overlay backdrop
+        const overlay = document.createElement('div');
+        overlay.className = 'wt-nav-overlay';
+        const navEl = document.querySelector('.wt-nav');
+        navEl.insertAdjacentElement('afterend', overlay);
+
+        // Drawer logic
+        function openDrawer() {
+            navEl.classList.add('wt-nav-open');
+            overlay.classList.add('wt-nav-overlay-open');
+            body.style.overflow = 'hidden';
+        }
+        function closeDrawer() {
+            navEl.classList.remove('wt-nav-open');
+            overlay.classList.remove('wt-nav-overlay-open');
+            body.style.overflow = '';
+        }
+        mobileBar.querySelector('.wt-hamburger').addEventListener('click', openDrawer);
+        overlay.addEventListener('click', closeDrawer);
+        navEl.querySelectorAll('.wt-nav-link').forEach(function (a) {
+            a.addEventListener('click', closeDrawer);
+        });
 
         // Wrap existing content
         const isColumn = body.dataset.layout === 'column';

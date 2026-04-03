@@ -1277,9 +1277,8 @@ function aggregateIngredients() {
     const qty = craftsNeededGroup(gk, g); // already ceiled
     activeVariant.Ingredients.forEach((ing, i) => {
       const modPct = ing.IsStatic ? 100 : (perRecipe.modifiers[i] !== undefined ? perRecipe.modifiers[i] : globalModValue);
-      // Cost per single craft (after modifier), then ceil it, then multiply by number of crafts
-      const costPerCraft = Math.ceil(ing.Ammount * (modPct / 100));
-      const effectiveQty = costPerCraft * qty;
+      // Apply modifier to total quantity, then ceil (per-craft ceil would leave amount=1 ingredients unchanged)
+      const effectiveQty = Math.ceil(ing.Ammount * qty * (modPct / 100));
       const aggKey = ing.IsSpecificItem ? `item||${ing.Name}` : `tag||${ing.Tag}`;
       if (!agg[aggKey]) {
         const ingName = ing.IsSpecificItem ? ing.Name : ing.Tag;

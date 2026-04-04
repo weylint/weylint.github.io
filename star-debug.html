@@ -220,23 +220,23 @@
             <div class="params-grid">
                 <div class="param-item">
                     <label>Experience Difficulty Modifier</label>
-                    <input type="number" id="p-edm" value="1" step="0.01">
+                    <input type="number" id="p-edm" value="2" step="1">
                 </div>
                 <div class="param-item">
                     <label>Percent Multiplier (%)</label>
-                    <input type="number" id="p-pm" value="108" step="0.1">
+                    <input type="number" id="p-pm" value="105" step="1">
                 </div>
                 <div class="param-item">
                     <label>Base Cost</label>
-                    <input type="number" id="p-bc" value="13" step="0.1">
+                    <input type="number" id="p-bc" value="12" step="1">
                 </div>
                 <div class="param-item">
                     <label>Stars Required per Stage</label>
-                    <input type="number" id="p-srps" value="4" step="1" min="1">
+                    <input type="number" id="p-srps" value="3" step="1" min="1">
                 </div>
                 <div class="param-item">
                     <label>Experience Increased Additive</label>
-                    <input type="number" id="p-eia" value="5" step="0.1">
+                    <input type="number" id="p-eia" value="9" step="1">
                 </div>
             </div>
         </div>
@@ -262,11 +262,11 @@
 
         function getParams() {
             return {
-                edm:  parseFloat(document.getElementById('p-edm').value)  || 1,
-                pm:   (parseFloat(document.getElementById('p-pm').value)   || 108) / 100,
-                bc:   parseFloat(document.getElementById('p-bc').value)   || 13,
-                srps: parseInt(document.getElementById('p-srps').value)   || 4,
-                eia:  parseFloat(document.getElementById('p-eia').value)  || 5,
+                edm:  parseFloat(document.getElementById('p-edm').value)  || 2,
+                pm:   (parseFloat(document.getElementById('p-pm').value)   || 105) / 100,
+                bc:   parseFloat(document.getElementById('p-bc').value)   || 12,
+                srps: parseInt(document.getElementById('p-srps').value)   || 3,
+                eia:  parseFloat(document.getElementById('p-eia').value)  || 9,
             };
         }
 

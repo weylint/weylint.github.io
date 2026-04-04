@@ -110,7 +110,14 @@
         </div>
 
         <div class="chart-card">
-            <h2>Actions per Hour</h2>
+            <h2>Actions per Minute per Active Player <span style="color:#6e7681;font-size:0.8em">(Most recent day usually incomplete data)</span></h2>
+            <div id="apm-wrap" class="chart-wrap">
+                <canvas id="apm-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h2>Actions per Hour <span style="color:#6e7681;font-size:0.8em">(Most recent day usually incomplete data)</span></h2>
             <div id="actions-wrap" class="chart-wrap">
                 <canvas id="actions-chart"></canvas>
             </div>
@@ -136,10 +143,11 @@
         ];
 
         const DATASETS = {
-            nutrition: 'MedianNutritionValueOfActiveCitizens',
-            housing:   'MedianHouseValueOfActiveCitizens',
-            play:      'Play',
-            gdp:       'GDP',
+            nutrition:      'MedianNutritionValueOfActiveCitizens',
+            housing:        'MedianHouseValueOfActiveCitizens',
+            play:           'Play',
+            activeCitizens: 'ActiveCitizenPopulation',
+            gdp:            'GDP',
         };
 
         async function fetchDataset(slug, dataSet) {
@@ -253,6 +261,7 @@
                 fetchDataset(server.slug, DATASETS.nutrition).then(data => ({ server, key: 'nutrition', data })),
                 fetchDataset(server.slug, DATASETS.housing).then(data => ({ server, key: 'housing', data })),
                 fetchDataset(server.slug, DATASETS.play).then(data => ({ server, key: 'play', data })),
+                fetchDataset(server.slug, DATASETS.activeCitizens).then(data => ({ server, key: 'activeCitizens', data })),
                 // fetchDataset(server.slug, DATASETS.gdp).then(data => ({ server, key: 'gdp', data })),
             ]);
 
@@ -266,13 +275,35 @@
                 banner.style.display = 'block';
             }
 
-            const nutritionResults = results.filter(r => r.key === 'nutrition');
-            const housingResults   = results.filter(r => r.key === 'housing');
-            const playResults      = results.filter(r => r.key === 'play');
+            const nutritionResults     = results.filter(r => r.key === 'nutrition');
+            const housingResults       = results.filter(r => r.key === 'housing');
+            const playResults          = results.filter(r => r.key === 'play');
+            const activeCitizenResults = results.filter(r => r.key === 'activeCitizens');
+
+            // Compute Actions per Minute per Active Player (play values are per hour, /60 for per minute)
+            const apmResults = SERVERS.map(server => {
+                const play    = playResults.find(r => r.server === server);
+                const players = activeCitizenResults.find(r => r.server === server);
+                if (!play?.data || !players?.data) return { server, data: null };
+
+                const playerIndex = new Map(players.data.Times.map((t, i) => [t, i]));
+                const Times  = [];
+                const Values = [];
+                play.data.Times.forEach((t, i) => {
+                    const pi = playerIndex.get(t);
+                    if (pi === undefined) return;
+                    const pop = players.data.Values[pi];
+                    if (!pop) return;
+                    Times.push(t);
+                    Values.push((play.data.Values[i] / 60) / pop);
+                });
+                return { server, data: { Times, Values } };
+            });
 
             buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults, 'Skill Points');
             buildChart('housing-chart',   'housing-wrap',   housingResults,   'Skill Points');
             buildChart('actions-chart',   'actions-wrap',   playResults,      'Actions per Hour');
+            buildChart('apm-chart',       'apm-wrap',       apmResults,       'Actions / min / player');
             // buildChart('gdp-chart',    'gdp-wrap',       results.filter(r => r.key === 'gdp'), 'GDP');
         }
 

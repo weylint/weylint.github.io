@@ -208,7 +208,8 @@
     "Paper Milling": 3, "Pottery": 3, "Shipwright": 3, "Smelting": 3, "Tailoring": 3,
     "Advanced Baking": 4, "Advanced Cooking": 4, "Advanced Smelting": 4,
     "Electronics": 4, "Mechanics": 4, "Oil Drilling": 4,
-    "Advanced Masonry": 5, "Composites": 5, "Cutting Edge Cooking": 5, "Industry": 5
+    "Advanced Masonry": 5, "Composites": 5, "Cutting Edge Cooking": 5, "Industry": 5,
+    "Self Improvement": 0  // always free, always pre-selected
   };
 
   // ── Radii ─────────────────────────────────────────────────────────
@@ -230,6 +231,7 @@
 
   let allNodes = [], allEdges = [];
   const nodeMap = {}, nodeEls = {}, edgeEls = {};
+  let _skillNodes = [], _talentNodes = [], _talentBits = 1;
 
   // ── Pan / zoom ────────────────────────────────────────────────────
   const view = { x: 0, y: 0, scale: 1 };
@@ -558,13 +560,16 @@ function svgText(x, y, content, attrs) {
   // ── Interaction ───────────────────────────────────────────────────
   function effectiveCost(node) {
     if (!state.whiteTigerMode) return node.stars;
-    return node.stars + state.allocatedSkills.size;
+    // Self Improvement is always free and doesn't count toward the stacking surcharge
+    const paidCount = [...state.allocatedSkills].filter(id => id !== 'Self Improvement').length;
+    return node.stars + paidCount;
   }
 
   function handleClick(node) {
     if (node.type === 'profession') return;
 
     if (node.type === 'skill') {
+      if (node.id === 'Self Improvement') { showInfo(node); return; } // always allocated, locked
       if (state.allocatedSkills.has(node.id)) {
         // Can't deallocate if talents are taken
         const hasTaken = allNodes.some(n =>
@@ -603,6 +608,7 @@ function svgText(x, y, content, attrs) {
     }
 
     applyState();
+    serializeState();
     if (node.type !== 'talent') showInfo(node);
   }
 
@@ -695,6 +701,13 @@ function svgText(x, y, content, attrs) {
         `<div class="info-detail">${count} skills</div>`;
 
     } else if (node.type === 'skill') {
+      if (node.id === 'Self Improvement') {
+        el.innerHTML =
+          `<div class="info-title">Self Improvement <span style="color:#3fb950">★0 — Always allocated</span></div>` +
+          `<div class="info-detail">Self Improvement</div>` +
+          `<div class="info-hint">Free and pre-selected. Does not increase White Tiger stacking cost. Talents still cost 1 star each.</div>`;
+        return;
+      }
       const allocated = state.allocatedSkills.has(node.id);
       const hasTaken  = allNodes.some(n =>
         n.type === 'talent' && n.skillId === node.id && state.takenTalents.has(n.id));
@@ -714,11 +727,94 @@ function svgText(x, y, content, attrs) {
     }
   }
 
+  // ── Bit helpers for compact URL encoding ─────────────────────────
+  function setBit(buf, pos) { buf[pos >> 3] |= 1 << (pos & 7); }
+  function getBit(buf, pos) { return (buf[pos >> 3] >> (pos & 7)) & 1; }
+  function writeBits(buf, pos, nbits, val) {
+    for (let i = 0; i < nbits; i++, val >>= 1)
+      if (val & 1) setBit(buf, pos + i);
+  }
+  function readBits(buf, pos, nbits) {
+    let val = 0;
+    for (let i = 0; i < nbits; i++)
+      val |= getBit(buf, pos + i) << i;
+    return val;
+  }
+
+  // ── URL persistence ───────────────────────────────────────────────
+  // Bit layout (little-endian within bytes):
+  //   bits 0..(N_skills-1) : skill selection bitmask
+  //   bit  N_skills         : White Tiger Mode
+  //   bits N_skills+1..31   : padding
+  //   bits 32+              : talent counts, _talentBits bits each
+  function serializeState() {
+    const totalBits = 32 + _talentNodes.length * _talentBits;
+    const buf = new Uint8Array(Math.ceil(totalBits / 8));
+
+    _skillNodes.forEach((node, i) => {
+      if (state.allocatedSkills.has(node.id)) setBit(buf, i);
+    });
+    if (state.whiteTigerMode) setBit(buf, _skillNodes.length);
+
+    _talentNodes.forEach((node, j) => {
+      const count = state.takenTalents.get(node.id) || 0;
+      if (count) writeBits(buf, 32 + j * _talentBits, _talentBits, count);
+    });
+
+    let end = buf.length;
+    while (end > 0 && buf[end - 1] === 0) end--;
+    const hex = Array.from(buf.subarray(0, end)).map(b => b.toString(16).padStart(2, '0')).join('');
+    history.replaceState(null, '', hex ? '?b=' + hex : location.pathname);
+  }
+
+  function deserializeState() {
+    const p = new URLSearchParams(location.search);
+    if (!p.has('b')) return;
+
+    const hex = p.get('b');
+    const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(h => parseInt(h, 16)));
+
+    state.whiteTigerMode = !!getBit(bytes, _skillNodes.length);
+    document.getElementById('wt-mode-btn').classList.toggle('active', state.whiteTigerMode);
+
+    state.allocatedSkills.clear();
+    state.allocatedSkills.add('Self Improvement');
+    _skillNodes.forEach((node, i) => {
+      if (getBit(bytes, i)) state.allocatedSkills.add(node.id);
+    });
+
+    state.takenTalents.clear();
+    state.takenBySkillLevel.clear();
+    _talentNodes.forEach((node, j) => {
+      const count = readBits(bytes, 32 + j * _talentBits, _talentBits);
+      if (count && state.allocatedSkills.has(node.skillId)) {
+        state.takenTalents.set(node.id, count);
+        state.takenBySkillLevel.set(node.levelKey, node.id);
+      }
+    });
+
+    // Recompute skillPaidCost and totalStars in canonical order (deterministic WTM stacking)
+    state.skillPaidCost.clear();
+    state.skillPaidCost.set('Self Improvement', 0);
+    state.totalStars = 0;
+    let paidCount = 0;
+    _skillNodes.forEach(node => {
+      if (state.allocatedSkills.has(node.id)) {
+        const cost = state.whiteTigerMode ? node.stars + paidCount : node.stars;
+        state.skillPaidCost.set(node.id, cost);
+        state.totalStars += cost;
+        paidCount++;
+      }
+    });
+    state.takenTalents.forEach(count => { state.totalStars += count; });
+  }
+
   // ── White Tiger Mode toggle ───────────────────────────────────────
   document.getElementById('wt-mode-btn').addEventListener('click', () => {
     state.whiteTigerMode = !state.whiteTigerMode;
     document.getElementById('wt-mode-btn').classList.toggle('active', state.whiteTigerMode);
     applyState();
+    serializeState();
   });
 
   // ── Reset ─────────────────────────────────────────────────────────
@@ -728,7 +824,10 @@ function svgText(x, y, content, attrs) {
     state.takenBySkillLevel.clear();
     state.skillPaidCost.clear();
     state.totalStars = 0;
+    state.allocatedSkills.add('Self Improvement');
+    state.skillPaidCost.set('Self Improvement', 0);
     applyState();
+    serializeState();
     document.getElementById('info-content').innerHTML =
       '<span class="info-empty">Reset. Hover a node to begin.</span>';
   });
@@ -742,11 +841,19 @@ function svgText(x, y, content, attrs) {
       allEdges = edges;
       nodes.forEach(n => nodeMap[n.id] = n);
 
+      _skillNodes = allNodes.filter(n => n.type === 'skill' && n.id !== 'Self Improvement');
+      _talentNodes = allNodes.filter(n => n.type === 'talent');
+      const maxTk = _talentNodes.reduce((m, n) => Math.max(m, n.maxTakes), 1);
+      _talentBits = Math.max(1, Math.ceil(Math.log2(maxTk + 1)));
+
       // Center the tree
       view.x = svg.clientWidth  / 2;
       view.y = svg.clientHeight / 2;
 
+      state.allocatedSkills.add('Self Improvement');
+      state.skillPaidCost.set('Self Improvement', 0);
       renderTree();
+      deserializeState();
       applyTransform();
       applyState();
     })

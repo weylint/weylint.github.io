@@ -46,6 +46,19 @@
       flex-shrink: 0;
     }
 
+    .wt-mode-btn {
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+    .wt-mode-btn:hover { border-color: #e3b341; color: #e3b341; }
+    .wt-mode-btn.active { border-color: #e3b341; color: #e3b341; }
+
     .reset-btn {
       margin-left: auto;
       background: none;
@@ -144,6 +157,7 @@
 <div class="header">
   <h1>Talent Calculator</h1>
   <span class="star-counter">★ <span id="star-count">0</span> stars</span>
+  <button class="wt-mode-btn" id="wt-mode-btn">White Tiger Mode</button>
   <div class="legend">
     <div class="legend-item">
       <div class="legend-dot" style="border-color:#3fb950; background:#3fb950;"></div>
@@ -200,15 +214,17 @@
   // ── Radii ─────────────────────────────────────────────────────────
   const R_PROF  = 180;
   const R_SKILL = 390;
-  const R_T3    = 510;
-  const R_T6    = 610;
+  const R_T3    = 600;
+  const R_T6    = 740;
 
   // ── State ─────────────────────────────────────────────────────────
   const state = {
     allocatedSkills:   new Set(),   // skill name strings
     takenTalents:      new Map(),   // talent.class → count (1…maxTakes)
     takenBySkillLevel: new Map(),   // "skillId-level" → talentClass
-    totalStars: 0
+    totalStars: 0,
+    whiteTigerMode: false,
+    skillPaidCost: new Map()        // skillId → stars actually paid
   };
 
   let allNodes = [], allEdges = [];
@@ -298,17 +314,65 @@
     tooltip.style.display = 'none';
   }
 
+  // ── Optimal profession ordering ───────────────────────────────────
+  // Minimises the max talent-count at every profession→profession boundary.
+  // "Boundary cost" between A and B = last_skill_talent_count(A) + first_skill_talent_count(B).
+  // Exhaustive search over (n-1)! circular permutations with branch-and-bound.
+  function optimizeProfessionOrder(profs) {
+    const n = profs.length;
+    if (n <= 2) return profs;
+
+    function boundaryCount(skill) {
+      return Math.max(
+        skill.talents.filter(t => t.level === 3).length,
+        skill.talents.filter(t => t.level === 6).length
+      );
+    }
+    const fc = profs.map(p => boundaryCount(p.skills[0]));
+    const lc = profs.map(p => boundaryCount(p.skills[p.skills.length - 1]));
+
+    // Fix profession 0 as the circular anchor; permute indices 1…n-1.
+    const rest = Array.from({length: n - 1}, (_, i) => i + 1);
+
+    let bestScore = Infinity;
+    let bestRest = [...rest];
+
+    function permute(depth, runningMax) {
+      if (runningMax >= bestScore) return; // prune
+      if (depth === rest.length) {
+        const closing = lc[rest[rest.length - 1]] + fc[0];
+        const score = Math.max(runningMax, closing);
+        if (score < bestScore) { bestScore = score; bestRest = [...rest]; }
+        return;
+      }
+      for (let i = depth; i < rest.length; i++) {
+        [rest[depth], rest[i]] = [rest[i], rest[depth]];
+        const prev = depth === 0 ? 0 : rest[depth - 1];
+        const edgeCost = lc[prev] + fc[rest[depth]];
+        permute(depth + 1, Math.max(runningMax, edgeCost));
+        [rest[depth], rest[i]] = [rest[i], rest[depth]];
+      }
+    }
+
+    permute(0, 0);
+    return [profs[0], ...bestRest.map(i => profs[i])];
+  }
+
   // ── Layout ────────────────────────────────────────────────────────
   function computeLayout(professions) {
+    professions = optimizeProfessionOrder(professions);
     const nodes = [], edges = [];
     const total = professions.reduce((s, p) => s + p.skills.length, 0);
-    const profSlice = (Math.PI * 2) / professions.length;  // equal for professions
-    let skillStart = -Math.PI / 2;  // proportional tracker for skills
+    const profSlice = (Math.PI * 2) / professions.length;
+    let skillStart = -Math.PI / 2;
+
+    // Geometry-based talent spread cap: leave enough gap to the neighbouring skill's talents
+    const skillAngularWidth = (Math.PI * 2) / total;
+    const maxSpread = (skillAngularWidth - 2 * 13 / R_T3) * 0.9;
 
     professions.forEach((prof, pi) => {
-      // Profession: evenly spaced
+      // Profession: evenly spaced so nodes never crowd each other
       const profMid = -Math.PI / 2 + profSlice * pi + profSlice / 2;
-
       const profNode = {
         type: 'profession',
         id: `prof:${prof.profession}`,
@@ -320,7 +384,7 @@
       };
       nodes.push(profNode);
 
-      // Skills: proportional slice (as originally)
+      // Skills: proportional slice
       const skillSlice = (prof.skills.length / total) * Math.PI * 2;
 
       prof.skills.forEach((skill, si) => {
@@ -346,7 +410,7 @@
           const talents = skill.talents.filter(t => t.level === lvl);
           if (!talents.length) return;
           const R = lvl === 3 ? R_T3 : R_T6;
-          const spread = (talents.length - 1) * 0.12; // radians between outermost
+          const spread = Math.min((talents.length - 1) * 0.12, maxSpread);
           talents.forEach((t, ti) => {
             const offset = talents.length > 1
               ? -spread / 2 + ti * (spread / (talents.length - 1))
@@ -442,7 +506,7 @@
 
         const starTxt = svgText(node.x, startY + 3, `★${node.stars}`, {
           'text-anchor': 'middle', 'font-size': '9', 'font-weight': 'bold',
-          'fill': '#e3b341', 'pointer-events': 'none'
+          'fill': '#e3b341', 'pointer-events': 'none', 'data-role': 'star-label'
         });
         g.appendChild(starTxt);
 
@@ -488,6 +552,11 @@ function svgText(x, y, content, attrs) {
   }
 
   // ── Interaction ───────────────────────────────────────────────────
+  function effectiveCost(node) {
+    if (!state.whiteTigerMode) return node.stars;
+    return node.stars + state.allocatedSkills.size;
+  }
+
   function handleClick(node) {
     if (node.type === 'profession') return;
 
@@ -498,10 +567,14 @@ function svgText(x, y, content, attrs) {
           n.type === 'talent' && n.skillId === node.id && state.takenTalents.has(n.id));
         if (hasTaken) return;
         state.allocatedSkills.delete(node.id);
-        state.totalStars -= node.stars;
+        const paid = state.skillPaidCost.get(node.id) ?? node.stars;
+        state.totalStars -= paid;
+        state.skillPaidCost.delete(node.id);
       } else {
+        const cost = effectiveCost(node);
         state.allocatedSkills.add(node.id);
-        state.totalStars += node.stars;
+        state.skillPaidCost.set(node.id, cost);
+        state.totalStars += cost;
       }
     } else if (node.type === 'talent') {
       if (!state.allocatedSkills.has(node.skillId)) return;
@@ -549,6 +622,13 @@ function svgText(x, y, content, attrs) {
         circle.setAttribute('fill', allocated ? '#1c2128' : '#161b22');
         circle.setAttribute('stroke', allocated ? '#3fb950' : '#30363d');
         circle.setAttribute('stroke-width', allocated ? '2.5' : '2');
+        const starEl = el.querySelector('[data-role="star-label"]');
+        if (starEl) {
+          const displayCost = allocated
+            ? (state.skillPaidCost.get(node.id) ?? node.stars)
+            : effectiveCost(node);
+          starEl.textContent = `★${displayCost}`;
+        }
 
       } else if (node.type === 'talent') {
         const skillAllocated = state.allocatedSkills.has(node.skillId);
@@ -617,22 +697,32 @@ function svgText(x, y, content, attrs) {
       const status = allocated
         ? `<span style="color:#3fb950">Allocated</span>`
         : `<span style="color:#8b949e">Not allocated</span>`;
+      const cost = effectiveCost(node);
       const hint = allocated
         ? (hasTaken ? 'Remove taken talents first to deallocate' : 'Click to deallocate and refund stars')
-        : `Click to allocate — costs ${node.stars} star${node.stars !== 1 ? 's' : ''}`;
+        : `Click to allocate — costs ${cost} star${cost !== 1 ? 's' : ''}` +
+          (state.whiteTigerMode && cost !== node.stars ? ` (base ${node.stars} + ${cost - node.stars} White Tiger)` : '');
       el.innerHTML =
-        `<div class="info-title">${node.name} <span style="color:#e3b341">★${node.stars}</span> — ${status}</div>` +
+        `<div class="info-title">${node.name} <span style="color:#e3b341">★${allocated ? (state.skillPaidCost.get(node.id) ?? node.stars) : cost}</span> — ${status}</div>` +
         `<div class="info-detail">${node.professionName}</div>` +
         `<div class="info-hint">${hint}</div>`;
 
     }
   }
 
+  // ── White Tiger Mode toggle ───────────────────────────────────────
+  document.getElementById('wt-mode-btn').addEventListener('click', () => {
+    state.whiteTigerMode = !state.whiteTigerMode;
+    document.getElementById('wt-mode-btn').classList.toggle('active', state.whiteTigerMode);
+    applyState();
+  });
+
   // ── Reset ─────────────────────────────────────────────────────────
   document.getElementById('reset-btn').addEventListener('click', () => {
     state.allocatedSkills.clear();
     state.takenTalents.clear();
     state.takenBySkillLevel.clear();
+    state.skillPaidCost.clear();
     state.totalStars = 0;
     applyState();
     document.getElementById('info-content').innerHTML =

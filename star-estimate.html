@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Star Estimate - White Tiger</title>
     <script src="nav.js"></script>
+    <script src="star-algo.js"></script>
     <style>
         * {
             margin: 0;
@@ -288,23 +289,23 @@
             <div class="params-grid">
                 <div class="param-item">
                     <label>Experience Difficulty Modifier</label>
-                    <input type="number" id="p-edm" value="2" step="1">
+                    <input type="number" id="p-edm" step="1">
                 </div>
                 <div class="param-item">
                     <label>Percent Multiplier (%)</label>
-                    <input type="number" id="p-pm" value="105" step="1">
+                    <input type="number" id="p-pm" step="1">
                 </div>
                 <div class="param-item">
                     <label>Base Cost</label>
-                    <input type="number" id="p-bc" value="12" step="1">
+                    <input type="number" id="p-bc" step="1">
                 </div>
                 <div class="param-item">
                     <label>Stars Required per Stage</label>
-                    <input type="number" id="p-srps" value="3" step="1" min="1">
+                    <input type="number" id="p-srps" step="1" min="1">
                 </div>
                 <div class="param-item">
                     <label>Experience Increased Additive</label>
-                    <input type="number" id="p-eia" value="9" step="1">
+                    <input type="number" id="p-eia" step="1">
                 </div>
             </div>
         </div>
@@ -357,27 +358,6 @@
             20: { skill1: '',                  skill2: '',                unlock: ''        },
         };
 
-        function getParams() {
-            return {
-                edm:  parseFloat(document.getElementById('p-edm').value)  || 2,
-                pm:   (parseFloat(document.getElementById('p-pm').value)   || 105) / 100,
-                bc:   parseFloat(document.getElementById('p-bc').value)   || 12,
-                srps: parseInt(document.getElementById('p-srps').value)   || 3,
-                eia:  parseFloat(document.getElementById('p-eia').value)  || 9,
-            };
-        }
-
-        function buildXpTable(p, count) {
-            const table = [];
-            let prev = p.edm * p.pm * p.bc;
-            table.push(prev);
-            for (let x = 1; x < count; x++) {
-                prev = prev * p.pm + p.eia * Math.floor((x + 1) / p.srps);
-                table.push(prev);
-            }
-            return table;
-        }
-
         // Accepts: "Day 4, 10:00" / "4,10:00" / "4 10:00" / "4" → total hours
         function parseCurrentTime(str) {
             if (!str || !str.trim()) return null;
@@ -417,7 +397,7 @@
         }
 
         function _render() {
-            const p = getParams();
+            const p = StarAlgo.getParams();
             const currentLevel  = Math.max(1, parseFloat(document.getElementById('current-level').value) || 1);
             const xpPerDay      = parseFloat(document.getElementById('xp-multiplier').value) || 0;
             const currentTime   = parseCurrentTime(document.getElementById('day-time').value);
@@ -425,7 +405,7 @@
             const internalLevel      = currentLevel - 1;
             const currentStage       = Math.floor(internalLevel);
             const progress           = internalLevel - currentStage;
-            const xpTable            = buildXpTable(p, MAX_STAGES);
+            const xpTable            = StarAlgo.buildXpTable(p, MAX_STAGES);
             const remainingInCurrent = (1 - progress) * xpTable[currentStage];
 
             const currentDay          = currentTime !== null ? Math.floor(currentTime / 24) : 0;
@@ -496,11 +476,12 @@
             if (level && level !== 1) p.set('level', level);
             if (xp)          p.set('xp',    xp);
             if (time)        p.set('time',  time);
-            if (edm  !== 2)  p.set('edm',   edm);
-            if (pm   !== 105) p.set('pm',   pm);
-            if (bc   !== 12) p.set('bc',    bc);
-            if (srps !== 3)  p.set('srps',  srps);
-            if (eia  !== 9)  p.set('eia',   eia);
+            const D = StarAlgo.DEFAULTS;
+            if (edm  !== D.edm)  p.set('edm',   edm);
+            if (pm   !== D.pm)   p.set('pm',    pm);
+            if (bc   !== D.bc)   p.set('bc',    bc);
+            if (srps !== D.srps) p.set('srps',  srps);
+            if (eia  !== D.eia)  p.set('eia',   eia);
             const qs = p.toString();
             history.replaceState(null, '', qs ? '?' + qs : location.pathname);
         }
@@ -511,6 +492,13 @@
         }
 
         document.querySelectorAll('input').forEach(el => el.addEventListener('input', render));
+
+        const _d = StarAlgo.DEFAULTS;
+        document.getElementById('p-edm').value  = _d.edm;
+        document.getElementById('p-pm').value   = _d.pm;
+        document.getElementById('p-bc').value   = _d.bc;
+        document.getElementById('p-srps').value = _d.srps;
+        document.getElementById('p-eia').value  = _d.eia;
 
         loadFromUrl();
         render();

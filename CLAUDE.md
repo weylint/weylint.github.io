@@ -18,6 +18,7 @@ No build system. Plain HTML files with inline `<script>` tags, served via GitHub
 | `white-tiger-api.js` | Shared API module — `WhiteTigerAPI.fetchRecipes()` / `.fetchStores()` / `.fetchAllItems()` |
 | `eco-render.js` | Shared rendering helpers (store name HTML, color tags) |
 | `transport-algo.js` | Pure transport profit algorithm (no DOM, no API calls) |
+| `star-algo.js` | Shared star XP formula — `StarAlgo.DEFAULTS` / `.getParams()` / `.buildXpTable()` — used by `star-estimate.html` and `star-debug.html` |
 | `docs/api-stores.md` | API reference for the `/stores` endpoint |
 | `docs/api-recipes.md` | API reference for the `/recipes` endpoint |
 | `docs/api-allItems.md` | API reference for the `/allItems` endpoint |

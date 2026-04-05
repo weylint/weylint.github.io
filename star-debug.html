@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Star Debug - White Tiger</title>
     <script src="nav.js"></script>
+    <script src="star-algo.js"></script>
     <style>
         * {
             margin: 0;
@@ -220,23 +221,23 @@
             <div class="params-grid">
                 <div class="param-item">
                     <label>Experience Difficulty Modifier</label>
-                    <input type="number" id="p-edm" value="2" step="1">
+                    <input type="number" id="p-edm" step="1">
                 </div>
                 <div class="param-item">
                     <label>Percent Multiplier (%)</label>
-                    <input type="number" id="p-pm" value="105" step="1">
+                    <input type="number" id="p-pm" step="1">
                 </div>
                 <div class="param-item">
                     <label>Base Cost</label>
-                    <input type="number" id="p-bc" value="12" step="1">
+                    <input type="number" id="p-bc" step="1">
                 </div>
                 <div class="param-item">
                     <label>Stars Required per Stage</label>
-                    <input type="number" id="p-srps" value="3" step="1" min="1">
+                    <input type="number" id="p-srps" step="1" min="1">
                 </div>
                 <div class="param-item">
                     <label>Experience Increased Additive</label>
-                    <input type="number" id="p-eia" value="9" step="1">
+                    <input type="number" id="p-eia" step="1">
                 </div>
             </div>
         </div>
@@ -260,27 +261,6 @@
     <script>
         const MAX_STAGES = 40;
 
-        function getParams() {
-            return {
-                edm:  parseFloat(document.getElementById('p-edm').value)  || 2,
-                pm:   (parseFloat(document.getElementById('p-pm').value)   || 105) / 100,
-                bc:   parseFloat(document.getElementById('p-bc').value)   || 12,
-                srps: parseInt(document.getElementById('p-srps').value)   || 3,
-                eia:  parseFloat(document.getElementById('p-eia').value)  || 9,
-            };
-        }
-
-        function buildXpTable(p, count) {
-            const table = [];
-            let prev = p.edm * p.pm * p.bc;
-            table.push(prev);
-            for (let x = 1; x < count; x++) {
-                prev = prev * p.pm + p.eia * Math.floor((x + 1) / p.srps);
-                table.push(prev);
-            }
-            return table;
-        }
-
         function loadFromUrl() {
             const p = new URLSearchParams(location.search);
             if (p.has('level')) document.getElementById('current-level').value = p.get('level');
@@ -297,12 +277,12 @@
         function render() {
             updateUrl();
 
-            const p = getParams();
+            const p = StarAlgo.getParams();
             const currentLevel       = Math.max(1, parseFloat(document.getElementById('current-level').value) || 1);
             const internalLevel      = currentLevel - 1;
             const currentStage       = Math.floor(internalLevel);
             const progress           = internalLevel - currentStage;
-            const xpTable            = buildXpTable(p, MAX_STAGES);
+            const xpTable            = StarAlgo.buildXpTable(p, MAX_STAGES);
             const remainingInCurrent = (1 - progress) * xpTable[currentStage];
 
             const tbody = document.getElementById('xp-table-body');
@@ -333,6 +313,13 @@
         }
 
         document.querySelectorAll('input').forEach(el => el.addEventListener('input', render));
+
+        const _d = StarAlgo.DEFAULTS;
+        document.getElementById('p-edm').value  = _d.edm;
+        document.getElementById('p-pm').value   = _d.pm;
+        document.getElementById('p-bc').value   = _d.bc;
+        document.getElementById('p-srps').value = _d.srps;
+        document.getElementById('p-eia').value  = _d.eia;
 
         loadFromUrl();
         render();

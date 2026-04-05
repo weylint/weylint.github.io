@@ -212,10 +212,11 @@
   };
 
   // ── Radii ─────────────────────────────────────────────────────────
-  const R_PROF  = 180;
-  const R_SKILL = 390;
-  const R_T3    = 600;
-  const R_T6    = 740;
+  const R_PROF   = 180;
+  const R_SKILL  = 390;
+  const R_T3     = 600;
+  const R_T6     = 740;
+  const R_TALENT = 10;   // talent node visual/collision radius
 
   // ── State ─────────────────────────────────────────────────────────
   const state = {
@@ -368,7 +369,7 @@
 
     // Geometry-based talent spread cap: leave enough gap to the neighbouring skill's talents
     const skillAngularWidth = (Math.PI * 2) / total;
-    const maxSpread = (skillAngularWidth - 2 * 13 / R_T3) * 0.9;
+    const maxSpread = (skillAngularWidth - 2 * R_TALENT / R_T3) * 0.9;
 
     professions.forEach((prof, pi) => {
       // Profession: evenly spaced so nodes never crowd each other
@@ -412,24 +413,27 @@
           const R = lvl === 3 ? R_T3 : R_T6;
           const spread = Math.min((talents.length - 1) * 0.12, maxSpread);
           talents.forEach((t, ti) => {
+            // Uncertain talents have no class; assign a unique synthetic id so
+            // they don't all collapse onto nodeMap[undefined].
+            const talentId = t.class || `${skill.skill}-uncertain-${lvl}-${ti}`;
             const offset = talents.length > 1
               ? -spread / 2 + ti * (spread / (talents.length - 1))
               : 0;
             const ta = skillAngle + offset;
             nodes.push({
               type: 'talent',
-              id: t.class,
-              name: t.display_name.replace(/\s*:.*$/, ''),
-              description: t.description,
+              id: talentId,
+              name: t.display_name ? t.display_name.replace(/\s*:.*$/, '') : '?',
+              description: t.description || 'Details not yet confirmed.',
               level: lvl,
               levelKey: `${skill.skill}-${lvl}`,
               skillId: skill.skill,
               maxTakes: t.max_takes || 1,
               x: R * Math.cos(ta),
               y: R * Math.sin(ta),
-              r: 13
+              r: R_TALENT
             });
-            edges.push({ from: skillNode.id, to: t.class, type: 'skill-talent', level: lvl });
+            edges.push({ from: skillNode.id, to: talentId, type: 'skill-talent', level: lvl });
           });
         });
       });

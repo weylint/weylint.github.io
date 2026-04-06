@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XP Calculator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #58a6ff;
+      letter-spacing: 0.02em;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    input[type="number"] {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      width: 100%;
+    }
+
+    input[type="number"]:focus {
+      outline: 2px solid #58a6ff;
+      outline-offset: 1px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead tr {
+      background: #0d1117;
+    }
+
+    th {
+      padding: 0.75rem 1rem;
+      text-align: right;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #8b949e;
+      border-bottom: 1px solid #21262d;
+      white-space: nowrap;
+    }
+
+    th:first-child { text-align: center; }
+
+    td {
+      padding: 0.6rem 1rem;
+      text-align: right;
+      border-bottom: 1px solid #21262d;
+      font-variant-numeric: tabular-nums;
+    }
+
+    td:first-child { text-align: center; }
+
+    tr:last-child td { border-bottom: none; }
+
+    /* Alternating rows */
+    tbody tr:nth-child(even) { background: #0d1117; }
+
+    /* Stage boundary highlight */
+    tbody tr.stage-boundary td {
+      border-top: 2px solid #58a6ff;
+    }
+
+    /* Level column */
+    td.level {
+      font-weight: 700;
+      color: #58a6ff;
+    }
+
+    /* Stage badge */
+    td.stage {
+      color: #8b949e;
+    }
+
+    /* XP columns */
+    td.xp {
+      color: #c9d1d9;
+    }
+
+    td.xp-delta {
+      color: #3fb950;
+      font-size: 0.8rem;
+    }
+
+    td.cumulative {
+      color: #58a6ff;
+    }
+
+    .stage-label {
+      display: inline-block;
+      background: #21262d;
+      color: #8b949e;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+  </style>
+  <script src="nav.js"></script>
+</head>
+<body>
+  <h1>XP Requirement Calculator</h1>
+
+  <div class="controls">
+    <div class="field">
+      <label>Difficulty Modifier</label>
+      <input type="number" id="difficultyModifier" value="2.5" step="0.1" min="0">
+    </div>
+    <div class="field">
+      <label>Percent Multiplier (%)</label>
+      <input type="number" id="percentMultiplier" value="105" step="0.5" min="100">
+    </div>
+    <div class="field">
+      <label>Base Cost</label>
+      <input type="number" id="baseCost" value="13" step="1" min="1">
+    </div>
+    <div class="field">
+      <label>Stars per Stage</label>
+      <input type="number" id="levelsPerStage" value="8" step="1" min="1">
+    </div>
+    <div class="field">
+      <label>Additive XP Increase</label>
+      <input type="number" id="additiveXp" value="5" step="1" min="0">
+    </div>
+    <div class="field">
+      <label>Levels to Show</label>
+      <input type="number" id="levelCount" value="40" step="1" min="1" max="200">
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="results">
+      <thead>
+        <tr>
+          <th>Level</th>
+          <th>Stage</th>
+          <th>Star in Stage</th>
+          <th>Required XP</th>
+          <th>+XP vs Prev</th>
+          <th>Cumulative XP</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    function compute() {
+      const diffMod    = parseFloat(document.getElementById('difficultyModifier').value) || 1;
+      const pctMul     = parseFloat(document.getElementById('percentMultiplier').value) / 100 || 1;
+      const baseCost   = parseFloat(document.getElementById('baseCost').value) || 1;
+      const lps        = parseInt(document.getElementById('levelsPerStage').value)  || 1;
+      const addXp      = parseFloat(document.getElementById('additiveXp').value) || 0;
+      const levelCount = parseInt(document.getElementById('levelCount').value) || 40;
+
+      const baseXp = baseCost * diffMod;
+      const mp = Math.pow(pctMul, lps);
+
+      const rows = [];
+      let cumulative = 0;
+
+      for (let star = 0; star < levelCount; star++) {
+        const fullStages = Math.floor(star / lps);
+        const remainder  = star % lps;
+
+        const mr  = Math.pow(pctMul, remainder);
+        const mnp = Math.pow(mp, fullStages);
+
+        let xp;
+        if (Math.abs(mp - 1) < 1e-10) {
+          // mp ≈ 1: geometric series collapses to linear
+          xp = baseXp * mnp * mr + addXp * mr * fullStages;
+        } else {
+          xp = baseXp * mnp * mr + addXp * mr * (mnp - 1) / (mp - 1);
+        }
+
+        cumulative += xp;
+        rows.push({ level: star + 1, fullStages, remainder, xp, cumulative });
+      }
+
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const prev = i > 0 ? rows[i - 1].xp : null;
+        const delta = prev !== null ? r.xp - prev : null;
+
+        const tr = document.createElement('tr');
+
+        // Stage boundary = first level of a new stage (except level 1)
+        if (r.remainder === 0 && i > 0) {
+          tr.classList.add('stage-boundary');
+        }
+
+        tr.innerHTML = `
+          <td class="level">${r.level}</td>
+          <td class="stage">${r.remainder === 0 && i > 0
+            ? `<span class="stage-label">Stage ${r.fullStages + 1}</span>`
+            : (i === 0 ? `<span class="stage-label">Stage 1</span>` : `${r.fullStages + 1}`)
+          }</td>
+          <td>${r.remainder + 1} / ${lps}</td>
+          <td class="xp">${fmt(r.xp)}</td>
+          <td class="xp-delta">${delta !== null ? (delta >= 0 ? '+' : '') + fmt(delta) : '—'}</td>
+          <td class="cumulative">${fmt(r.cumulative)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function fmt(n) {
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    document.querySelectorAll('input').forEach(el => el.addEventListener('input', compute));
+    compute();
+  </script>
+</body>
+</html>

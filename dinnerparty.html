@@ -544,9 +544,10 @@
   .panel-divider { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 1rem 0; }
   .selected-summary {
     font-size: 0.78rem;
-    opacity: 0.6;
+    color: rgba(255,255,255,0.6);
     margin-bottom: 0.6rem;
   }
+  .selected-summary strong { color: var(--cream); }
   /* SKILL GROUPS IN SHOPPING LIST */
   .sl-skill-group { margin-bottom: 0; }
   .sl-skill-header {
@@ -599,6 +600,35 @@
   }
   .copy-btn:hover { background: #f0cf7a; }
   .copy-btn.copied { background: var(--sage); color: white; }
+
+  /* UPDATE PRICES BUTTON */
+  .update-prices-btn {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.6rem;
+    background: none;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    font-family: inherit;
+  }
+  .update-prices-btn:hover:not(:disabled) { border-color: #58a6ff; color: #58a6ff; }
+  .update-prices-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* PRICE COLUMNS IN SHOPPING LIST */
+  .shopping-item-price {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: right;
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+  .price-ok { color: var(--sage); }
+  .price-warn { color: var(--rust); }
+  .price-missing { color: rgba(255,255,255,0.35); font-weight: 400; }
 
   /* EMPTY STATES */
   .no-results {
@@ -840,6 +870,7 @@
           Select recipes to see your ingredient list
         </div>
       </div>
+      <button class="update-prices-btn" id="updatePricesBtn" onclick="updatePrices()">Update Prices</button>
       <button class="copy-btn" id="copyBtn" onclick="copyShoppingList()">📋 Copy to Clipboard</button>
       <button class="copy-btn optimize-btn" onclick="openOptimize()" style="margin-top:0.5rem;background:#5566aa;color:white">⚡ Optimize Tables</button>
     </div>
@@ -1567,6 +1598,57 @@ function getIngredientSkill(ingName, isTag) {
   return productSkillMap[ingName] || 'Raw / Gathered';
 }
 
+// ---- STORE PRICING ----
+let offersIndex = null;
+
+function buildOffersIndex(storeData) {
+  const index = new Map();
+  for (const store of (storeData.Stores ?? [])) {
+    if (!store.Enabled) continue;
+    for (const offer of (store.AllOffers ?? [])) {
+      if (offer.Buying) continue;
+      if (offer.Quantity <= 0) continue;
+      if (!offer.ItemName) continue;
+      const key = offer.ItemName.toLowerCase();
+      if (!index.has(key)) index.set(key, []);
+      index.get(key).push({ price: offer.Price, qty: offer.Quantity });
+    }
+  }
+  for (const offers of index.values()) offers.sort((a, b) => a.price - b.price);
+  return index;
+}
+
+function computeCost(itemName, needed) {
+  const key = itemName.toLowerCase();
+  if (!offersIndex.has(key)) return { cost: 0, shortfall: needed, notFound: true };
+  const offers = offersIndex.get(key);
+  let remaining = needed, total = 0;
+  for (const { price, qty } of offers) {
+    const take = Math.min(remaining, qty);
+    total += take * price;
+    remaining -= take;
+    if (remaining <= 0) break;
+  }
+  return { cost: total, shortfall: remaining, notFound: false };
+}
+
+async function updatePrices() {
+  const btn = document.getElementById('updatePricesBtn');
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+  try {
+    const data = await WhiteTigerAPI.fetchStores();
+    offersIndex = buildOffersIndex(data);
+    updateShoppingList();
+    btn.textContent = 'Update Prices';
+  } catch (e) {
+    console.error('Update Prices failed:', e);
+    btn.textContent = 'Update Prices (failed)';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Shared aggregation logic
 // ---- SHOPPING LIST ----
 function updateShoppingList() {
@@ -1605,7 +1687,54 @@ function updateShoppingList() {
   skillColorMap['No Skill Required'] = '#999';
   skillColorMap['Raw / Gathered'] = '#7a8a6a';
 
-  let html = `<div class="selected-summary">${selected.length} dish${selected.length>1?'es':''} · target ${globalServings} per dish</div>`;
+  // Compute total food crafted (for avg price per food)
+  let totalFoodCrafted = 0;
+  selected.forEach(g => {
+    const gk = groupKey(g.productName);
+    const gs = groupState[gk];
+    const activeRecipe = g.recipes.find(r => r.Key === gs.activeRecipeKey) || g.recipes[0];
+    if (!activeRecipe) return;
+    const perRecipe = gs.perRecipe[activeRecipe.Key];
+    if (!perRecipe) return;
+    const activeVariant = activeRecipe.Variants.find(v => v.Key === perRecipe.variantKey) || activeRecipe.Variants[0];
+    if (!activeVariant) return;
+    totalFoodCrafted += craftsNeededGroup(gk, g) * getPrimaryProductAmt(activeRecipe, activeVariant);
+  });
+
+  // Pre-compute costs so totals are available before building HTML
+  const itemCosts = new Map();
+  let grandTotal = 0, missingCount = 0, shortfallCount = 0;
+  if (offersIndex) {
+    specificItems.forEach(item => {
+      const r = computeCost(item.name, item.total);
+      itemCosts.set(item.name, r);
+      if (r.notFound) { missingCount++; }
+      else { grandTotal += r.cost; if (r.shortfall > 0) shortfallCount++; }
+    });
+  }
+
+  function priceSpan(item) {
+    if (!offersIndex) return '';
+    if (item.isTag) return `<span class="shopping-item-price price-missing">—</span>`;
+    const r = itemCosts.get(item.name);
+    if (r.notFound) return `<span class="shopping-item-price price-missing">?</span>`;
+    if (r.shortfall > 0) return `<span class="shopping-item-price price-warn" title="Only ${item.total - r.shortfall} of ${item.total} available">${r.cost.toFixed(2)} € ⚠</span>`;
+    return `<span class="shopping-item-price price-ok">${r.cost.toFixed(2)} €</span>`;
+  }
+
+  // Summary line — includes price totals once prices are loaded
+  let summaryLine = `${selected.length} dish${selected.length>1?'es':''} · target ${globalServings} per dish`;
+  if (offersIndex) {
+    const avgPerFood = totalFoodCrafted > 0 ? grandTotal / totalFoodCrafted : 0;
+    summaryLine += ` · <strong>${grandTotal.toFixed(2)} €</strong> total · ${avgPerFood.toFixed(2)} €/food`;
+    if (missingCount > 0 || shortfallCount > 0) {
+      const warn = [];
+      if (missingCount > 0) warn.push(`${missingCount} not in stores`);
+      if (shortfallCount > 0) warn.push(`${shortfallCount} low stock`);
+      summaryLine += ` <span class="price-missing">(${warn.join(', ')})</span>`;
+    }
+  }
+  let html = `<div class="selected-summary">${summaryLine}</div>`;
 
   // Tags on top
   if (tagItems.length > 0) {
@@ -1620,6 +1749,7 @@ function updateShoppingList() {
       html += `<div class="shopping-item">
         <span class="shopping-item-name is-tag">Any ${item.name}</span>
         <span class="shopping-item-qty">×${displayQty}</span>
+        ${priceSpan(item)}
       </div>`;
     });
     html += `</div>`;
@@ -1640,6 +1770,7 @@ function updateShoppingList() {
       html += `<div class="shopping-item">
         <span class="shopping-item-name">${item.name}</span>
         <span class="shopping-item-qty">×${displayQty}</span>
+        ${priceSpan(item)}
       </div>`;
     });
     html += `</div>`;

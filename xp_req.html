@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>XP Calculator</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -19,6 +21,38 @@
       margin-bottom: 1.5rem;
       color: #58a6ff;
       letter-spacing: 0.02em;
+    }
+
+    .formula-panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .formula-panel-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.75rem;
+    }
+
+    .formula-line {
+      color: #c9d1d9;
+      margin-bottom: 0.5rem;
+      overflow-x: auto;
+    }
+
+    .formula-line:last-child { margin-bottom: 0; }
+
+    .formula-note {
+      font-size: 0.8rem;
+      color: #8b949e;
+      margin-top: 0.5rem;
     }
 
     .controls {
@@ -146,11 +180,21 @@
       font-size: 0.7rem;
       font-weight: 600;
     }
+
+    /* KaTeX color override */
+    .katex { color: #c9d1d9; }
   </style>
   <script src="nav.js"></script>
 </head>
 <body>
   <h1>XP Requirement Calculator</h1>
+
+  <div class="formula-panel">
+    <div class="formula-panel-label">Formula</div>
+    <div class="formula-line" id="formula-vars"></div>
+    <div class="formula-line" id="formula-main"></div>
+    <div class="formula-note" id="formula-degen"></div>
+  </div>
 
   <div class="controls">
     <div class="field">
@@ -205,7 +249,7 @@
       const levelCount = parseInt(document.getElementById('levelCount').value) || 40;
 
       const baseXp = baseCost * diffMod;
-      const mp = Math.pow(pctMul, lps);
+      const mp = pctMul ** lps;
 
       const rows = [];
       let cumulative = 0;
@@ -214,15 +258,15 @@
         const fullStages = Math.floor(star / lps);
         const remainder  = star % lps;
 
-        const mr  = Math.pow(pctMul, remainder);
-        const mnp = Math.pow(mp, fullStages);
+        const mr  = pctMul ** remainder;
+        const mnp = mp ** fullStages;
 
         let xp;
         if (Math.abs(mp - 1) < 1e-10) {
           // mp ≈ 1: geometric series collapses to linear
-          xp = baseXp * mnp * mr + addXp * mr * fullStages;
+          xp = baseXp * pctMul ** star + addXp * mr * fullStages;
         } else {
-          xp = baseXp * mnp * mr + addXp * mr * (mnp - 1) / (mp - 1);
+          xp = baseXp * pctMul ** star + addXp * mr * (mnp - 1) / (mp - 1);
         }
 
         cumulative += xp;
@@ -263,8 +307,32 @@
       return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function renderFormulas() {
+      katex.render(
+        String.raw`r = \text{pctMul},\quad L = \text{starsPerStage},\quad \Delta = \text{additiveXP},\quad R = r^L,\quad n = \lfloor s / L \rfloor,\quad k = s \bmod L`,
+        document.getElementById('formula-vars'),
+        { throwOnError: false, displayMode: false }
+      );
+      katex.render(
+        String.raw`\text{XP}(s) \;=\; \text{baseXp} \cdot r^s \;+\; \Delta \cdot r^k \cdot \dfrac{R^n - 1}{R - 1}`,
+        document.getElementById('formula-main'),
+        { throwOnError: false, displayMode: true }
+      );
+      katex.render(
+        String.raw`\text{When } R = 1\text{:}\quad \text{XP}(s) = \text{baseXp} \cdot r^s + \Delta \cdot r^k \cdot n`,
+        document.getElementById('formula-degen'),
+        { throwOnError: false, displayMode: false }
+      );
+    }
+
     document.querySelectorAll('input').forEach(el => el.addEventListener('input', compute));
     compute();
+
+    if (document.readyState === 'complete') {
+      renderFormulas();
+    } else {
+      window.addEventListener('load', renderFormulas);
+    }
   </script>
 </body>
 </html>

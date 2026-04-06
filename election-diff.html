@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elections - White Tiger</title>
+    <script src="nav.js"></script>
+    <script src="temp/elections-fallback.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 { color: #58a6ff; margin-bottom: 6px; }
+        header > p { color: #8b949e; font-size: 0.875rem; }
+
+        .error-banner {
+            background: #0d1117;
+            border: 1px solid #6e3030;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #f85149;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+        }
+
+        .loading .spinner {
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid #30363d;
+            border-top-color: #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .no-data {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+            font-size: 0.875rem;
+        }
+
+        /* ── Election card ──────────────────────────────────── */
+
+        .election-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .election-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 14px 20px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .state-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid;
+            flex-shrink: 0;
+        }
+
+        .election-name { color: #c9d1d9; font-size: 0.95rem; }
+
+        .election-creator {
+            color: #6e7681;
+            font-size: 0.8rem;
+            margin-left: auto;
+        }
+
+        /* ── Provision ──────────────────────────────────────── */
+
+        .provision { padding: 16px 20px 0; }
+        .provision:last-child { padding-bottom: 16px; }
+
+        .provision-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+        }
+
+        .prov-old { color: #f85149; }
+        .prov-arrow { color: #6e7681; }
+        .prov-new { color: #3fb950; }
+
+        .prov-old a, .prov-new a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .prov-old a:hover { text-decoration: underline; }
+        .prov-new a:hover { text-decoration: underline; }
+
+        .ud-label {
+            font-size: 0.75rem;
+            color: #6e7681;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+        }
+
+        .provision-error {
+            color: #f85149;
+            font-size: 0.8rem;
+            padding: 10px 0;
+        }
+
+        /* ── Diff code block ────────────────────────────────── */
+
+        .diff-code-block {
+            background: #0d1117;
+            border-top: 1px solid #30363d;
+            border-bottom: 1px solid #30363d;
+            padding: 6px 0;
+            margin-left: calc(-20px - max(0px, (100vw - 260px - 900px) / 2));
+            width: calc(100vw - 260px);
+            overflow-x: auto;
+            font-size: 0.82rem;
+            margin-bottom: 14px;
+        }
+
+        .diff-identical {
+            padding: 6px 14px;
+            color: #6e7681;
+            font-size: 0.8rem;
+        }
+
+        .diff-line {
+            display: flex;
+            line-height: 1.7;
+            padding-right: 16px;
+            white-space: pre;
+        }
+
+        .diff-line.diff-del { background: rgba(248, 81, 73, 0.12); }
+        .diff-line.diff-ins { background: rgba(63, 185, 80, 0.12); }
+
+        .diff-g {
+            flex-shrink: 0;
+            width: 28px;
+            text-align: center;
+            color: #6e7681;
+            user-select: none;
+            padding-top: 1px;
+            font-size: 0.85em;
+        }
+
+        .diff-g-del { color: #f85149; }
+        .diff-g-ins { color: #3fb950; }
+
+        .diff-c {
+            flex: 1;
+            margin-left: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .diff-collapsed {
+            color: #6e7681;
+            font-size: 0.78rem;
+            padding: 3px 0 3px 38px;
+            background: #0d1117;
+            border-top: 1px solid #21262d;
+            border-bottom: 1px solid #21262d;
+            margin: 2px 0;
+        }
+
+        /* ── Eco markup styles ──────────────────────────────── */
+
+        .eco-hdr        { color: #58a6ff; font-weight: bold; }
+        .eco-govt       { color: #e3b341; }
+        .eco-currency   { color: #3fb950; }
+        .eco-bank       { color: #58a6ff; }
+        .eco-positive   { color: #3fb950; }
+        .eco-comment    { color: #6a9955; font-style: italic; }
+
+        .eco-kw-event   { color: #c586c0; }
+        .eco-kw-then    { color: #4ec9b0; }
+        .eco-kw-cond    { color: #c586c0; }
+        .eco-kw-op      { color: #569cd6; }
+
+        .eco-chip {
+            display: inline-block;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 3px;
+            padding: 1px 6px;
+            font-size: 0.8em;
+            color: #c9d1d9;
+            margin: 0 1px;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        .eco-foldout { position: relative; display: inline-block; }
+
+        .eco-foldout-label {
+            color: #58a6ff;
+            font-size: 0.8em;
+            border-bottom: 1px dotted #58a6ff;
+            cursor: default;
+        }
+
+        .eco-foldout-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 0;
+            z-index: 100;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px 12px;
+            min-width: 400px;
+            max-width: 700px;
+            font-size: 0.8rem;
+            color: #8b949e;
+            line-height: 1.8;
+            white-space: normal;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+
+        .eco-foldout:hover .eco-foldout-tooltip { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Law Elections</h1>
+            <p>Diff view for active elections proposing law changes.</p>
+        </header>
+        <div id="error-banner" class="error-banner"></div>
+        <div id="main">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading elections&hellip;</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'https://white-tiger.play.eco/api/v1';
+
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function stateColor(state) {
+            if (state === 'Active')   return '#3fb950';
+            if (state === 'Proposed') return '#e3b341';
+            return '#6e7681';
+        }
+
+        // ── Eco text preprocessing ──────────────────────────────────────────────
+        // Converts raw Eco markup to an array of normalized display lines.
+        // Each line is a plain string with inline HTML (spans for colors/chips/etc.)
+        // but no wrapper divs — suitable for diffing.
+
+        function preprocessEcoLines(raw) {
+            if (!raw) return [];
+            let s = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            // Strip <nl ...> wrappers used in some API endpoints
+            s = s.replace(/<nl[^>]*>([\s\S]*?)<\/nl>/g, '$1\n');
+
+            let prev, passes = 0;
+            do {
+                prev = s;
+                s = s
+                    .replace(/<foldout><linktext>([\s\S]*?)<\/linktext><title>[\s\S]*?<\/title>([\s\S]*?)<\/foldout>/g,
+                        (_, sum, body) => `<span class="eco-foldout"><span class="eco-foldout-label">${sum}</span><span class="eco-foldout-tooltip">${body.trim().replace(/\n/g, '<br>')}</span></span>`)
+                    .replace(/<link="[^"]*"><icon[^>]*><color=#([0-9A-Fa-f]{6})[0-9A-Fa-f]{0,2}>([\s\S]*?)<\/color><\/icon><\/link>/g,
+                        (_, rgb, text) => `<span class="eco-chip" style="color:#${rgb}">${text}</span>`)
+                    .replace(/<link="[^"]*"><icon[^>]*>([\s\S]*?)<\/icon><\/link>/g,
+                        (_, text) => `<span class="eco-chip">${text}</span>`)
+                    .replace(/<link="[^"]*">([\s\S]*?)<\/link>/g, '$1')
+                    .replace(/<icon[^>]*>([\s\S]*?)<\/icon>/g, '$1')
+                    // Use a control-char sentinel for section headers (keeps them inline)
+                    .replace(/<style="Header">([\s\S]*?)<\/style>/g, '\x01$1\x01')
+                    .replace(/<style="Government">([\s\S]*?)<\/style>/g, '<span class="eco-govt">$1</span>')
+                    .replace(/<style="Currency">([\s\S]*?)<\/style>/g, '<span class="eco-currency">$1</span>')
+                    .replace(/<style="BankAccount">([\s\S]*?)<\/style>/g, '<span class="eco-bank">$1</span>')
+                    .replace(/<style="Positive">([\s\S]*?)<\/style>/g, '<span class="eco-positive">$1</span>')
+                    .replace(/<style="[^"]*">([\s\S]*?)<\/style>/g, '$1');
+            } while (s !== prev && ++passes < 10);
+
+            s = s.replace(/<color=#([0-9A-Fa-f]{6})[0-9A-Fa-f]{0,2}>/g, '<span style="color:#$1">');
+            s = s.replace(/<\/color>/g, '</span>');
+
+            const savedI = [];
+            s = s.replace(/<i>[\s\S]*?<\/i>/gi, m => { savedI.push(m); return `\x00${savedI.length - 1}\x00`; });
+
+            s = s.replace(/\bthen\s+if\b/gi, 'then\nif');
+            s = s.replace(/([^\n]+?)(if)(?=[ \t])/gi, '$1\nif');
+            s = s.replace(/\belse\s*\n\s*if\b/gi, 'else if');
+            s = s.replace(/\band\s*\n\s*if\b/gi, 'and if');
+
+            s = s.replace(/\x00(\d+)\x00/g, (_, i) =>
+                savedI[+i].replace(/^<i>([\s\S]*?)<\/i>$/i, (_, c) =>
+                    '\n// ' + c.trim().replace(/\n\s*/g, '\n// ') + '\n'));
+
+            return s.split('\n').map(l => l.trimStart());
+        }
+
+        // ── LCS diff ────────────────────────────────────────────────────────────
+
+        function computeDiff(a, b) {
+            const m = a.length, n = b.length;
+            const dp = Array.from({length: m + 1}, () => new Uint32Array(n + 1));
+            for (let i = 1; i <= m; i++)
+                for (let j = 1; j <= n; j++)
+                    dp[i][j] = a[i-1] === b[j-1]
+                        ? dp[i-1][j-1] + 1
+                        : Math.max(dp[i-1][j], dp[i][j-1]);
+
+            const out = [];
+            let i = m, j = n;
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+                    out.push({t: 'eq',  s: a[i-1]}); i--; j--;
+                } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+                    out.push({t: 'ins', s: b[j-1]}); j--;
+                } else {
+                    out.push({t: 'del', s: a[i-1]}); i--;
+                }
+            }
+            return out.reverse();
+        }
+
+        // Group diff into visible hunks (3 context lines) and collapsed spans.
+        function buildHunks(diff, ctx = 3) {
+            const vis = new Uint8Array(diff.length);
+            for (let i = 0; i < diff.length; i++)
+                if (diff[i].t !== 'eq') {
+                    const lo = Math.max(0, i - ctx), hi = Math.min(diff.length - 1, i + ctx);
+                    for (let k = lo; k <= hi; k++) vis[k] = 1;
+                }
+
+            const segs = [];
+            let i = 0;
+            while (i < diff.length) {
+                if (vis[i]) {
+                    const seg = {shown: true, lines: []};
+                    while (i < diff.length && vis[i]) seg.lines.push(diff[i++]);
+                    segs.push(seg);
+                } else {
+                    let count = 0;
+                    while (i < diff.length && !vis[i]) { count++; i++; }
+                    segs.push({shown: false, count});
+                }
+            }
+            return segs;
+        }
+
+        // ── Line rendering ───────────────────────────────────────────────────────
+
+        function colorLine(line) {
+            if (!line.trim()) return '';
+            // Section header sentinel
+            if (line.startsWith('\x01') && line.endsWith('\x01'))
+                return `<span class="eco-hdr">${line.slice(1, -1)}</span>`;
+            if (/^\/\//.test(line))
+                return `<span class="eco-comment">${line}</span>`;
+            return line
+                .replace(/^(on\s+event|on\s+every)\b/i, '<span class="eco-kw-event">$1</span>')
+                .replace(/^(then)\b/i,                   '<span class="eco-kw-then">$1</span>')
+                .replace(/^(else\s+if|and\s+if|if)\b/i,  '<span class="eco-kw-cond">$1</span>')
+                .replace(/^(else)\b/i,                   '<span class="eco-kw-cond">$1</span>')
+                .replace(/^(and|or|not)\b/i,             '<span class="eco-kw-op">$1</span>');
+        }
+
+        function renderDiffBlock(oldLines, newLines) {
+            const diff = computeDiff(oldLines, newLines);
+            if (diff.every(d => d.t === 'eq'))
+                return '<div class="diff-identical">No changes</div>';
+
+            const hunks = buildHunks(diff, 3);
+            return hunks.map(seg => {
+                if (!seg.shown)
+                    return `<div class="diff-collapsed">··· ${seg.count} unchanged line${seg.count === 1 ? '' : 's'} ···</div>`;
+
+                return seg.lines.map(({t, s}) => {
+                    const bg = t === 'del' ? ' diff-del' : t === 'ins' ? ' diff-ins' : '';
+                    const g  = t === 'del' ? '<span class="diff-g diff-g-del">−</span>'
+                             : t === 'ins' ? '<span class="diff-g diff-g-ins">+</span>'
+                             :               '<span class="diff-g">\u00a0</span>';
+                    return `<div class="diff-line${bg}">${g}<span class="diff-c">${colorLine(s)}</span></div>`;
+                }).join('');
+            }).join('');
+        }
+
+        // ── Main ─────────────────────────────────────────────────────────────────
+
+        function extractLawIds(actionOnComplete) {
+            const ids = [...actionOnComplete.matchAll(/view:360:(\d+)/g)].map(m => m[1]);
+            return ids.length === 2 ? [ids[0], ids[1]] : null;
+        }
+
+        async function main() {
+            const container = document.getElementById('main');
+            const banner    = document.getElementById('error-banner');
+
+            try {
+                const elections = await fetch(`${API}/elections?returnActive=true`)
+                    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+                    .catch(() => {
+                        if (window.ELECTIONS_FALLBACK) return window.ELECTIONS_FALLBACK;
+                        throw new Error('Server offline and no fallback available');
+                    });
+
+                // Filter to elections that have law-change provisions
+                const lawElections = elections
+                    .map(e => {
+                        const provisions = (e.Provisions || [])
+                            .map(p => {
+                                const ids = extractLawIds(p.ActionOnComplete || '');
+                                return ids ? {oldId: ids[0], newId: ids[1]} : null;
+                            })
+                            .filter(Boolean);
+                        return provisions.length > 0 ? {...e, lawProvisions: provisions} : null;
+                    })
+                    .filter(Boolean);
+
+                if (lawElections.length === 0) {
+                    container.innerHTML = '<div class="no-data">No active elections with law changes.</div>';
+                    return;
+                }
+
+                // Fetch all referenced laws in parallel (deduplicated)
+                const allIds = [...new Set(
+                    lawElections.flatMap(e => e.lawProvisions.flatMap(p => [p.oldId, p.newId]))
+                )];
+                const lawMap = {};
+                await Promise.all(allIds.map(async id => {
+                    const r = await fetch(`${API}/laws/${id}`);
+                    if (r.ok) lawMap[id] = await r.json();
+                }));
+
+                // Render
+                container.innerHTML = lawElections.map(e => {
+                    const color = stateColor(e.State);
+                    const badge = `<span class="state-badge" style="color:${color};border-color:${color}22;background:${color}11">${escapeHtml(e.State)}</span>`;
+
+                    const provisionsHtml = e.lawProvisions.map(p => {
+                        const oldLaw = lawMap[p.oldId];
+                        const newLaw = lawMap[p.newId];
+                        if (!oldLaw || !newLaw)
+                            return `<div class="provision"><div class="provision-error">Could not load laws for this provision (IDs: ${p.oldId} → ${p.newId}).</div></div>`;
+
+                        const oldDescLines = preprocessEcoLines(oldLaw.Description);
+                        const newDescLines = preprocessEcoLines(newLaw.Description);
+
+                        let userSection = '';
+                        if (oldLaw.UserDescription !== newLaw.UserDescription) {
+                            const oldUD = preprocessEcoLines(oldLaw.UserDescription);
+                            const newUD = preprocessEcoLines(newLaw.UserDescription);
+                            userSection = `
+                                <div class="ud-label">Description</div>
+                                <div class="diff-code-block">${renderDiffBlock(oldUD, newUD)}</div>
+                            `;
+                        }
+
+                        return `
+                            <div class="provision">
+                                <div class="provision-header">
+                                    <span class="prov-old"><a href="law-view.html?id=${p.oldId}">${escapeHtml(oldLaw.Name)}</a></span>
+                                    <span class="prov-arrow">→</span>
+                                    <span class="prov-new"><a href="law-view.html?id=${p.newId}">${escapeHtml(newLaw.Name)}</a></span>
+                                </div>
+                                ${userSection}
+                                <div class="diff-code-block">${renderDiffBlock(oldDescLines, newDescLines)}</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="election-card">
+                            <div class="election-header">
+                                ${badge}
+                                <span class="election-name">${escapeHtml(e.Name)}</span>
+                                <span class="election-creator">by ${escapeHtml(e.Creator)}</span>
+                            </div>
+                            ${provisionsHtml}
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                banner.textContent = `Could not load elections: ${err.message}`;
+                banner.style.display = 'block';
+                container.innerHTML = '';
+            }
+        }
+
+        main();
+    </script>
+</body>
+</html>

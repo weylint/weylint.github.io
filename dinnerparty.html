@@ -1899,11 +1899,13 @@ function getRecipeCraftTime(g) {
   const gk = groupKey(g.productName);
   const gs = groupState[gk];
   const activeRecipe = g.recipes.find(r => r.Key === gs.activeRecipeKey) || g.recipes[0];
+  const activeVariant = activeRecipe.Variants.find(v => v.Key === gs.perRecipe[activeRecipe.Key].variantKey) || activeRecipe.Variants[0];
   const crafts = craftsNeededGroup(gk, g);
   const baseMins = activeRecipe.BaseCraftTime || 0;
   const modPct = globalModValue / 100;
   const mins = Math.ceil(baseMins * modPct * crafts * 100) / 100;
-  return { mins, recipe: activeRecipe, crafts, name: g.productName, table: activeRecipe.CraftingTable };
+  const name = (activeVariant && activeVariant.Name) || g.productName;
+  return { mins, recipe: activeRecipe, crafts, name, table: activeRecipe.CraftingTable };
 }
 
 const TABLE_MAX_RECIPES = 5;

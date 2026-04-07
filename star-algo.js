@@ -1,5 +1,5 @@
 const StarAlgo = (() => {
-    const DEFAULTS = { edm: 2, pm: 105, bc: 12, srps: 3, eia: 9 };
+    const DEFAULTS = { edm: 2.5, pm: 105, bc: 13, srps: 8, eia: 5 };
 
     function getParams() {
         const d = DEFAULTS;
@@ -13,12 +13,21 @@ const StarAlgo = (() => {
     }
 
     function buildXpTable(p, count) {
+        const baseXp = p.bc * p.edm;
+        const mp = p.pm ** p.srps;
         const table = [];
-        let prev = p.edm * p.pm * p.bc;
-        table.push(prev);
-        for (let x = 1; x < count; x++) {
-            prev = prev * p.pm + p.eia * Math.floor((x + 1) / p.srps);
-            table.push(prev);
+        for (let star = 0; star < count; star++) {
+            const fullStages = Math.floor(star / p.srps);
+            const remainder  = star % p.srps;
+            const mr  = p.pm ** remainder;
+            const mnp = mp ** fullStages;
+            let xp;
+            if (Math.abs(mp - 1) < 1e-10) {
+                xp = baseXp * p.pm ** star + p.eia * mr * fullStages;
+            } else {
+                xp = baseXp * p.pm ** star + p.eia * mr * (mnp - 1) / (mp - 1);
+            }
+            table.push(xp);
         }
         return table;
     }

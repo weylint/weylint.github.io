@@ -1609,6 +1609,7 @@ function buildOffersIndex(storeData) {
       if (offer.Buying) continue;
       if (offer.Quantity <= 0) continue;
       if (!offer.ItemName) continue;
+      if (offer.Price >= 999999) continue;
       const key = offer.ItemName.toLowerCase();
       if (!index.has(key)) index.set(key, []);
       index.get(key).push({ price: offer.Price, qty: offer.Quantity });

@@ -194,6 +194,17 @@
             line-height: 1.4;
         }
 
+        .talent-effect {
+            font-size: 0.75rem;
+            margin-top: 4px;
+        }
+
+        .talent-recipes {
+            color: #6e7681;
+            font-size: 0.72rem;
+            margin-top: 3px;
+        }
+
         .max-takes-badge {
             color: #8b949e;
             background: #21262d;
@@ -315,10 +326,23 @@
                     const maxTakesBadge = (t.max_takes && t.max_takes > 1)
                         ? `<span class="max-takes-badge">×${t.max_takes}</span>`
                         : '';
+                    const effects = t.effects || (t.effect ? [{ effect: t.effect, recipes: t.recipes }] : []);
+                    const effectHtml = effects.map(e => {
+                        const recipesLine = (e.recipes && e.recipes.length)
+                            ? `<div class="talent-recipes">Affects: ${e.recipes.join(', ')}</div>`
+                            : '';
+                        if (e.unlocks && e.unlocks.length) {
+                            return `<div class="talent-effect" style="color:#58a6ff">Unlocks: ${e.unlocks.join(', ')}</div>`;
+                        }
+                        const effectColor = e.penalty ? '#f85149' : '#3fb950';
+                        return `<div class="talent-effect" style="color:${effectColor}">${e.effect}</div>${recipesLine}`;
+                    }).join('');
+                    const recipesHtml = '';
                     return `
                         <div class="talent">
                             <div class="talent-name">${name}${maxTakesBadge}</div>
                             <div class="talent-desc">${t.description}</div>
+                            ${effectHtml}${recipesHtml}
                         </div>
                     `;
                 }).join('');

@@ -304,11 +304,24 @@
 
   function showTooltip(node) {
     const color = node.level === 6 ? '#58a6ff' : '#3fb950';
-    tooltip.innerHTML =
+    let html =
       `<div class="tt-title">${node.name} <span style="color:${color};font-size:.75rem">lvl ${node.level}</span>` +
         (node.maxTakes > 1 ? ` <span style="color:#6e7681;font-size:.7rem">max ×${node.maxTakes}</span>` : '') +
       `</div>` +
       `<div class="tt-desc">${node.description}</div>`;
+    const effects = node.effects || (node.effect ? [{ effect: node.effect, recipes: node.recipes }] : null);
+    if (effects) {
+      html += effects.map(e => {
+        if (e.unlocks && e.unlocks.length)
+          return `<div style="color:#58a6ff;margin-top:5px;font-size:.77rem">Unlocks: ${e.unlocks.join(', ')}</div>`;
+        const effectColor = e.penalty ? '#f85149' : '#3fb950';
+        let s = `<div style="color:${effectColor};margin-top:5px;font-size:.77rem">${e.effect}</div>`;
+        if (e.recipes && e.recipes.length)
+          s += `<div style="color:#6e7681;font-size:.75rem">Affects: ${e.recipes.join(', ')}</div>`;
+        return s;
+      }).join('');
+    }
+    tooltip.innerHTML = html;
     tooltip.style.display = 'block';
     positionTooltip();
   }
@@ -431,6 +444,9 @@
               levelKey: `${skill.skill}-${lvl}`,
               skillId: skill.skill,
               maxTakes: t.max_takes || 1,
+              effects: t.effects || null,
+              effect: t.effect || null,
+              recipes: t.recipes || null,
               x: R * Math.cos(ta),
               y: R * Math.sin(ta),
               r: R_TALENT

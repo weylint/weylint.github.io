@@ -10,7 +10,6 @@
     <a class="wt-nav-link" href="xp_req.html" data-page="xp_req.html">XP Req</a>
     <div class="wt-nav-section">Economy</div>
     <a class="wt-nav-link" href="meteorstore.html" data-page="meteorstore.html">Meteor Store</a>
-    <a class="wt-nav-link" href="transport.html" data-page="transport.html">Transport</a>
     <a class="wt-nav-link" href="dinnerparty.html" data-page="dinnerparty.html">Dinner Party</a>
     <div class="wt-nav-section">Server</div>
     <a class="wt-nav-link" href="server-stats.html" data-page="server-stats.html">Server Stats</a>

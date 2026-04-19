@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Hitchhiker's Guide to Government</title>
+  <script src="../nav.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    .doc-layout {
+      display: flex;
+      gap: 24px;
+      max-width: 1040px;
+      margin: 0 auto;
+      align-items: flex-start;
+      padding: 20px 0 40px;
+    }
+
+    .doc-main { flex: 1; min-width: 0; }
+
+    header {
+      padding: 20px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      margin-bottom: 0;
+    }
+
+    header h1 {
+      color: #58a6ff;
+      font-size: 1.1rem;
+      font-weight: normal;
+      margin-bottom: 6px;
+    }
+
+    header .meta {
+      font-size: 0.8rem;
+      color: #8b949e;
+    }
+
+    #doc-content {
+      padding: 20px 0 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #6e7681;
+    }
+
+    .loading .spinner {
+      width: 28px;
+      height: 28px;
+      border: 2.5px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #doc-content h1,
+    #doc-content h2,
+    #doc-content h3,
+    #doc-content h4 {
+      color: #c9d1d9;
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+    }
+
+    #doc-content h1 { color: #58a6ff; font-size: 1.4rem; }
+    #doc-content h2 { font-size: 1.15rem; border-bottom: 1px solid #30363d; padding-bottom: 0.4rem; }
+    #doc-content h3 { font-size: 1rem; color: #8b949e; }
+    #doc-content h4 { font-size: 0.95rem; color: #8b949e; }
+
+    #doc-content p {
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    #doc-content ul, #doc-content ol {
+      margin-bottom: 1rem;
+      padding-left: 1.6rem;
+    }
+
+    #doc-content li {
+      margin-bottom: 0.4rem;
+      font-size: 0.9rem;
+    }
+
+    #doc-content a {
+      color: #58a6ff;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    #doc-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.875rem;
+    }
+
+    #doc-content th, #doc-content td {
+      border: 1px solid #21262d;
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+    }
+
+    #doc-content th {
+      background: #0d1117;
+      color: #8b949e;
+      font-weight: normal;
+    }
+
+    #doc-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin: 1rem 0;
+    }
+
+    #doc-content hr {
+      border: none;
+      border-top: 1px solid #30363d;
+      margin: 2rem 0;
+    }
+
+    #doc-content sup {
+      vertical-align: super;
+      font-size: 0.75em;
+      line-height: 0;
+    }
+
+    .error-msg {
+      background: #0d1117;
+      border: 1px solid #6e3030;
+      border-radius: 8px;
+      padding: 1.5rem;
+      color: #f85149;
+      text-align: center;
+      font-size: 0.875rem;
+      line-height: 1.6;
+    }
+
+    .error-msg code {
+      display: block;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: #8b949e;
+      word-break: break-all;
+    }
+
+    footer {
+      padding: 1.5rem 0 0;
+      border-top: 1px solid #30363d;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #6e7681;
+    }
+
+    /* TOC sidebar */
+    #toc-panel {
+      width: 180px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 20px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 0;
+    }
+
+    .toc-title {
+      color: #6e7681;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0 14px 8px;
+      border-bottom: 1px solid #30363d;
+      margin-bottom: 4px;
+    }
+
+    #toc-links a {
+      display: block;
+      padding: 5px 14px;
+      color: #8b949e;
+      font-size: 0.8rem;
+      text-decoration: none;
+      border-left: 2px solid transparent;
+    }
+
+    #toc-links a:hover { background: #1c2128; color: #c9d1d9; }
+    #toc-links a.toc-active { border-left-color: #58a6ff; color: #58a6ff; background: #1c2128; }
+
+    @media (max-width: 767px) { #toc-panel { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="doc-layout">
+    <aside id="toc-panel">
+      <div class="toc-title">Contents</div>
+      <nav id="toc-links"></nav>
+    </aside>
+    <div class="doc-main">
+      <header>
+        <h1>The Hitchhiker's Guide to Government</h1>
+        <div class="meta">An incomplete and (mostly) helpful guide to White Tiger Governance.</div>
+      </header>
+
+      <div id="doc-content">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Loading document&hellip;</p>
+        </div>
+      </div>
+
+      <footer>
+        White Tiger helper tools
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    (async () => {
+        const container = document.getElementById('doc-content');
+        const tocLinks = document.getElementById('toc-links');
+
+        try {
+            const res = await fetch('howtogov.md');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            container.innerHTML = marked.parse(text);
+
+            // Build TOC from h2 headings
+            container.querySelectorAll('h2').forEach(h => {
+                const slug = h.textContent.trim().toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                h.id = slug;
+                const a = document.createElement('a');
+                a.href = '#' + slug;
+                a.textContent = h.textContent.replace(/:$/, '');
+                tocLinks.appendChild(a);
+            });
+
+            // Highlight active TOC entry on scroll
+            const headings = Array.from(container.querySelectorAll('h2'));
+            const tocAnchors = Array.from(tocLinks.querySelectorAll('a'));
+
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        tocAnchors.forEach(a => a.classList.remove('toc-active'));
+                        const active = tocAnchors.find(a => a.hash === '#' + entry.target.id);
+                        if (active) active.classList.add('toc-active');
+                    }
+                });
+            }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+
+            headings.forEach(h => observer.observe(h));
+
+        } catch (err) {
+            container.innerHTML = `
+                <div class="error-msg">
+                    <strong>Could not load the document.</strong><br>
+                    <code>${err.message}</code>
+                </div>
+            `;
+        }
+    })();
+  </script>
+</body>
+</html>

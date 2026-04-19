@@ -14,6 +14,8 @@
     <div class="wt-nav-section">Server</div>
     <a class="wt-nav-link" href="server-stats.html" data-page="server-stats.html">Server Stats</a>
     <a class="wt-nav-link wt-nav-external" href="https://weylint.github.io/ecoflow" target="_blank" rel="noopener">EcoFlow <span class="wt-nav-ext-icon">↗</span></a>
+    <div class="wt-nav-section">Help</div>
+    <a class="wt-nav-link" href="help/howtogov.html" data-page="help/howtogov.html">How-To Gov</a>
     <div class="wt-nav-section">White Tiger Law</div>
     <a class="wt-nav-link" href="laws.html" data-page="laws.html">Ingame Laws</a>
     <a class="wt-nav-link" href="election-diff.html" data-page="election-diff.html">Election Diff</a>

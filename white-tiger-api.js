@@ -10,8 +10,9 @@ const WhiteTigerAPI = (() => {
   }
 
   return {
-    fetchRecipes:  () => fetchEndpoint('recipes'),
-    fetchStores:   () => fetchEndpoint('stores'),
-    fetchAllItems: () => fetchEndpoint('allItems'),
+    fetchRecipes:        () => fetchEndpoint('recipes'),
+    fetchStores:         () => fetchEndpoint('stores'),
+    fetchAllItems:       () => fetchEndpoint('allItems'),
+    fetchCraftingTables: () => fetchEndpoint('craftingTables'),
   };
 })();

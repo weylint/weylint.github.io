@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crafting Tables — White Tiger</title>
+    <script src="nav.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            background: #0d1117;
+            color: #c9d1d9;
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            margin: 0;
+            padding: 0;
+        }
+        .page-content {
+            padding: 24px;
+            max-width: 1100px;
+        }
+        h1 {
+            color: #58a6ff;
+            font-size: 1.5rem;
+            margin: 0 0 6px;
+        }
+        .subtitle {
+            color: #8b949e;
+            margin: 0 0 24px;
+            font-size: 0.9rem;
+        }
+        .chart-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .chart-card h2 {
+            color: #c9d1d9;
+            font-size: 1rem;
+            margin: 0 0 4px;
+        }
+        .chart-card .card-desc {
+            color: #8b949e;
+            font-size: 0.8rem;
+            margin: 0 0 16px;
+        }
+        .chart-wrap {
+            position: relative;
+        }
+        #loading {
+            color: #8b949e;
+            padding: 40px 0;
+            text-align: center;
+        }
+        #error-banner {
+            display: none;
+            background: #1a0f0f;
+            border: 1px solid #6e3030;
+            border-radius: 6px;
+            color: #f85149;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+        }
+        .charts-container { display: none; }
+    </style>
+</head>
+<body>
+<div class="page-content">
+    <h1>Crafting Tables</h1>
+    <p class="subtitle">Resource efficiency of every crafting table in the world.</p>
+
+    <div id="loading">Loading data…</div>
+    <div id="error-banner"></div>
+
+    <div class="charts-container" id="charts">
+        <div class="chart-card">
+            <h2>Tables by World Count</h2>
+            <p class="card-desc">Number of each crafting table type placed in the world, sorted by count. Tooltip shows the average skill multiplier across all instances.</p>
+            <div class="chart-wrap" id="chart1-wrap">
+                <canvas id="chart1"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h2>Skill Multiplier Distribution</h2>
+            <p class="card-desc">How many tables sit at each efficiency tier, broken down by upgrade type. Lower multiplier = fewer resources consumed per craft. The 1.0 bar is truncated — actual count shown above it.</p>
+            <div class="chart-wrap" style="height:320px;">
+                <canvas id="chart2"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h2>Professions at Max Efficiency (0.75)</h2>
+            <p class="card-desc">Which profession modules are installed on the best-upgraded tables.</p>
+            <div class="chart-wrap" style="height:320px;">
+                <canvas id="chart3"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="white-tiger-api.js"></script>
+<script>
+const MONO = { family: "Consolas, Menlo, Monaco, monospace", size: 12 };
+
+const THEME = {
+    tickColor:   '#8b949e',
+    gridColor:   '#21262d',
+    borderColor: '#30363d',
+    titleColor:  '#6e7681',
+    labelColor:  '#c9d1d9',
+    tooltipBg:   '#161b22',
+    pageBg:      '#0d1117',
+};
+
+function baseScales(xTitle, yTitle) {
+    return {
+        x: {
+            ticks:  { color: THEME.tickColor, font: MONO },
+            grid:   { color: THEME.gridColor },
+            border: { color: THEME.borderColor },
+            title:  xTitle ? { display: true, text: xTitle, color: THEME.titleColor, font: MONO } : undefined,
+        },
+        y: {
+            ticks:  { color: THEME.tickColor, font: MONO },
+            grid:   { color: THEME.gridColor },
+            border: { color: THEME.borderColor },
+            title:  yTitle ? { display: true, text: yTitle, color: THEME.titleColor, font: MONO } : undefined,
+        },
+    };
+}
+
+function basePlugins(showLegend) {
+    return {
+        legend: {
+            display: showLegend,
+            labels: { color: THEME.labelColor, font: MONO, boxWidth: 14, padding: 12 },
+        },
+        tooltip: {
+            backgroundColor: THEME.tooltipBg,
+            borderColor:     THEME.borderColor,
+            borderWidth:     1,
+            titleColor:      THEME.labelColor,
+            bodyColor:       THEME.tickColor,
+        },
+    };
+}
+
+function classifyTier(record) {
+    if (!record.ResourceEfficiencyModule) return 'None';
+    const rem = record.ResourceEfficiencyModule.toLowerCase();
+    if (rem.includes('modern'))   return 'Modern';
+    if (rem.includes('advanced')) return 'Advanced';
+    if (rem.includes('basic'))    return 'Basic';
+    // Skill-specific module name without tier word — infer from AllowedUpgrades
+    for (const u of record.AllowedUpgrades || []) {
+        const ul = u.toLowerCase();
+        if (ul === 'modern upgrade')   return 'Modern';
+        if (ul === 'advanced upgrade') return 'Advanced';
+        if (ul === 'basic upgrade')    return 'Basic';
+    }
+    return 'None';
+}
+
+// Custom plugin: draws a visual axis-break indicator on a clipped bar
+function makeAxisBreakPlugin(barIndex, actualValue, yMax) {
+    return {
+        id: 'axisBreak',
+        afterDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta.data[barIndex]) return;
+
+            const { ctx, chartArea } = chart;
+            const bar = meta.data[barIndex];
+            const x = bar.x;
+            const halfW = bar.width / 2;
+            const top = chartArea.top;
+
+            // Only draw the break if this bar is actually clipped (value > yMax)
+            if (actualValue <= yMax) return;
+
+            const y1 = top + 10;
+            const y2 = top + 22;
+            const gap = 3;
+
+            ctx.save();
+
+            // Cover the top of the bar with page-background strips to create the gap
+            ctx.fillStyle = THEME.pageBg;
+            ctx.fillRect(x - halfW, y1 - gap, bar.width, gap * 2 + 1);
+            ctx.fillRect(x - halfW, y2 - gap, bar.width, gap * 2 + 1);
+
+            // Draw zigzag lines across the gaps
+            ctx.strokeStyle = '#8b949e';
+            ctx.lineWidth = 1.5;
+            for (const zy of [y1, y2]) {
+                ctx.beginPath();
+                const step = 6;
+                let px = x - halfW;
+                ctx.moveTo(px, zy + 3);
+                let flip = 1;
+                while (px < x + halfW) {
+                    px += step;
+                    ctx.lineTo(Math.min(px, x + halfW), zy - 3 * flip);
+                    flip *= -1;
+                }
+                ctx.stroke();
+            }
+
+            // Draw actual value label above the bar
+            ctx.fillStyle = THEME.labelColor;
+            ctx.font = `12px Consolas, Menlo, Monaco, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(actualValue.toLocaleString(), x, top - 4);
+
+            ctx.restore();
+        }
+    };
+}
+
+function renderChart1(tables) {
+    // Count per table name, avg multiplier per table
+    const countMap = {};
+    const multSum  = {};
+    for (const t of tables) {
+        countMap[t.TableName] = (countMap[t.TableName] || 0) + 1;
+        multSum[t.TableName]  = (multSum[t.TableName]  || 0) + t.SkillMultiplier;
+    }
+    const entries = Object.keys(countMap)
+        .map(name => ({ name, count: countMap[name], avgMult: multSum[name] / countMap[name] }))
+        .sort((a, b) => b.count - a.count);
+
+    const labels  = entries.map(e => e.name);
+    const counts  = entries.map(e => e.count);
+    const avgMults = entries.map(e => e.avgMult);
+
+    // Colour each bar by avg multiplier: green (0.75) → blue (1.0)
+    const barColors = entries.map(e => {
+        const t = (e.avgMult - 0.75) / 0.25; // 0 = best, 1 = unupgraded
+        const r = Math.round(88  + (110 - 88)  * t);
+        const g = Math.round(166 + (  0 - 166) * t);
+        const b = Math.round(255 + (  0 - 255) * t);
+        return `rgb(${r},${g},${b})`;
+    });
+
+    const wrap = document.getElementById('chart1-wrap');
+    const height = Math.max(500, entries.length * 22);
+    wrap.style.height = height + 'px';
+
+    new Chart(document.getElementById('chart1'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Count',
+                data: counts,
+                backgroundColor: barColors,
+                borderWidth: 0,
+            }],
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                ...basePlugins(false),
+                tooltip: {
+                    ...basePlugins(false).tooltip,
+                    callbacks: {
+                        label: (ctx) => {
+                            const e = entries[ctx.dataIndex];
+                            return [
+                                `  Count: ${e.count}`,
+                                `  Avg multiplier: ${e.avgMult.toFixed(3)}`,
+                            ];
+                        },
+                    },
+                },
+            },
+            scales: {
+                ...baseScales('# of tables in world', null),
+                y: {
+                    ...baseScales(null, null).y,
+                    ticks: { color: THEME.tickColor, font: { ...MONO, size: 11 } },
+                },
+            },
+        },
+    });
+}
+
+function renderChart2(tables) {
+    const MULTIPLIERS = [1.0, 0.95, 0.90, 0.85, 0.80, 0.75];
+    const TIERS = ['None', 'Basic', 'Advanced', 'Modern'];
+    const COLORS = {
+        None:     '#6e7681',
+        Basic:    '#3fb950',
+        Advanced: '#58a6ff',
+        Modern:   '#bc8cff',
+    };
+
+    // Build count matrix: [tier][multIndex]
+    const counts = {};
+    for (const tier of TIERS) counts[tier] = new Array(MULTIPLIERS.length).fill(0);
+
+    for (const t of tables) {
+        const mi = MULTIPLIERS.indexOf(t.SkillMultiplier);
+        if (mi === -1) continue;
+        counts[classifyTier(t)][mi]++;
+    }
+
+    // Actual count for the 1.0 bar (for axis break label)
+    const actual10 = tables.filter(t => t.SkillMultiplier === 1.0).length;
+    const Y_MAX = 720;
+
+    const datasets = TIERS
+        .filter(tier => counts[tier].some(v => v > 0))
+        .map(tier => ({
+            label: tier === 'None' ? 'No module' : `${tier} upgrade`,
+            data: counts[tier],
+            backgroundColor: COLORS[tier],
+            borderWidth: 0,
+        }));
+
+    const axisBreakPlugin = makeAxisBreakPlugin(0, actual10, Y_MAX);
+
+    new Chart(document.getElementById('chart2'), {
+        type: 'bar',
+        plugins: [axisBreakPlugin],
+        data: {
+            labels: MULTIPLIERS.map(m => m.toFixed(2)),
+            datasets,
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                ...baseScales('Skill multiplier', 'Number of tables'),
+                y: {
+                    ...baseScales(null, 'Number of tables').y,
+                    stacked: true,
+                    max: Y_MAX,
+                },
+                x: {
+                    ...baseScales('Skill multiplier', null).x,
+                    stacked: true,
+                },
+            },
+            plugins: {
+                ...basePlugins(true),
+                tooltip: {
+                    ...basePlugins(true).tooltip,
+                    callbacks: {
+                        // Show real values even for the clipped bar
+                        footer: (items) => {
+                            const total = items.reduce((s, i) => s + i.parsed.y, 0);
+                            const mi = items[0]?.dataIndex;
+                            const mult = MULTIPLIERS[mi];
+                            const realTotal = mult === 1.0 ? actual10 : total;
+                            return `Total: ${realTotal}`;
+                        },
+                    },
+                },
+            },
+        },
+    });
+}
+
+function renderChart3(tables) {
+    const subset = tables.filter(t => t.SkillMultiplier === 0.75);
+    const countMap = {};
+    for (const t of subset) {
+        const prof = t.ModuleSkillType || 'Unknown';
+        countMap[prof] = (countMap[prof] || 0) + 1;
+    }
+    const entries = Object.entries(countMap).sort((a, b) => b[1] - a[1]);
+    const labels = entries.map(e => e[0]);
+    const counts = entries.map(e => e[1]);
+
+    new Chart(document.getElementById('chart3'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Tables at 0.75',
+                data: counts,
+                backgroundColor: '#e3b341',
+                borderWidth: 0,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                ...basePlugins(false),
+                tooltip: {
+                    ...basePlugins(false).tooltip,
+                    callbacks: {
+                        label: (ctx) => `  ${ctx.parsed.y} tables at max efficiency`,
+                    },
+                },
+            },
+            scales: baseScales('Profession', 'Number of tables'),
+        },
+    });
+}
+
+async function main() {
+    try {
+        const data = await WhiteTigerAPI.fetchCraftingTables();
+        const tables = data.CraftingTables;
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('charts').style.display = 'block';
+
+        renderChart1(tables);
+        renderChart2(tables);
+        renderChart3(tables);
+    } catch (err) {
+        document.getElementById('loading').style.display = 'none';
+        const banner = document.getElementById('error-banner');
+        banner.style.display = 'block';
+        banner.textContent = `Failed to load crafting tables: ${err.message}`;
+    }
+}
+
+main();
+</script>
+</body>
+</html>

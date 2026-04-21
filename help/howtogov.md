@@ -58,3 +58,4 @@ Options:
 - Federal Dinner Party? Why not! Find a cook, pay him decently (not handsomely!) and announce a time in #newspaper or #notice-board
 - Want to build something yourself or contract it out? Yup, can do!
 - Want to turn the Federal Presidents Palace into a beautiful art museum, showcasing the importance of proper Waste Management? You'll make the president angry, but it's an option!
+- Goals want an Event from you? You have options! Fishing Event, Dinner Party, Hide and Seek, anything your heart desires.

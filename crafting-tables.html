@@ -85,7 +85,7 @@
 
         <div class="chart-card">
             <h2>Skill Multiplier Distribution</h2>
-            <p class="card-desc">How many tables sit at each efficiency tier, broken down by upgrade type. Lower multiplier = fewer resources consumed per craft. The 1.0 bar is truncated — actual count shown above it.</p>
+            <p class="card-desc">How many tables sit at each efficiency tier, broken down by upgrade type. Lower multiplier = fewer resources consumed per craft. The two 1.0 columns separate tables that can never be upgraded from those with an empty slot — coloured by the tier they could accept. Both bars are truncated; the break indicator on the empty bar is coloured to show the Basic / Advanced / Modern split.</p>
             <div class="chart-wrap" style="height:320px;">
                 <canvas id="chart2"></canvas>
             </div>
@@ -164,58 +164,88 @@ function classifyTier(record) {
     return 'None';
 }
 
-// Custom plugin: draws a visual axis-break indicator on a clipped bar
-function makeAxisBreakPlugin(barIndex, actualValue, yMax) {
+// Custom tooltip positioner: keeps the anchor below the zigzag + tier strip zone.
+// ZIGZAG_CLEAR = zigzag centre (top+16) + amplitude (5) + tier strip (72) + margin (10) = ~103px
+const ZIGZAG_CLEAR = 103;
+Chart.Tooltip.positioners.belowBreak = function(elements, eventPos) {
+    const ca = this.chart.chartArea;
+    return { x: eventPos.x, y: Math.max(eventPos.y, ca.top + ZIGZAG_CLEAR) };
+};
+
+// Plugin: draws a single zigzag break line on clipped bars + actual count label.
+// bars = array of { barIndex, actualValue, segments? }
+//   segments (optional): [{color, count}] — drawn as a proportional tier strip
+//   in the visible bar body just below the zigzag line.
+function makeAxisBreakPlugin(bars, yMax) {
     return {
         id: 'axisBreak',
         afterDraw(chart) {
-            const meta = chart.getDatasetMeta(0);
-            if (!meta.data[barIndex]) return;
-
             const { ctx, chartArea } = chart;
-            const bar = meta.data[barIndex];
-            const x = bar.x;
-            const halfW = bar.width / 2;
-            const top = chartArea.top;
-
-            // Only draw the break if this bar is actually clipped (value > yMax)
-            if (actualValue <= yMax) return;
-
-            const y1 = top + 10;
-            const y2 = top + 22;
-            const gap = 3;
+            let meta;
+            for (let di = 0; di < chart.data.datasets.length; di++) {
+                const m = chart.getDatasetMeta(di);
+                if (m.data.length) { meta = m; break; }
+            }
+            if (!meta) return;
 
             ctx.save();
+            for (const { barIndex, actualValue, segments } of bars) {
+                if (actualValue <= yMax) continue;
+                const bar = meta.data[barIndex];
+                if (!bar) continue;
 
-            // Cover the top of the bar with page-background strips to create the gap
-            ctx.fillStyle = THEME.pageBg;
-            ctx.fillRect(x - halfW, y1 - gap, bar.width, gap * 2 + 1);
-            ctx.fillRect(x - halfW, y2 - gap, bar.width, gap * 2 + 1);
+                const x     = bar.x;
+                const halfW = bar.width / 2;
+                const left  = x - halfW;
+                const right = x + halfW;
+                const top   = chartArea.top;
+                const amp   = 5;          // zigzag tooth height
+                const zy    = top + 16;   // centre y of the zigzag line
 
-            // Draw zigzag lines across the gaps
-            ctx.strokeStyle = '#8b949e';
-            ctx.lineWidth = 1.5;
-            for (const zy of [y1, y2]) {
+                // Erase everything above the zigzag (replace truncated bar top)
+                ctx.fillStyle = THEME.pageBg;
+                ctx.fillRect(left, top, bar.width, zy - amp - top);
+
+                // Tier strip in the visible bar body, directly below the zigzag
+                if (segments && segments.length) {
+                    const STRIP_H = 72;
+                    const stripTop = zy + amp + 3;
+                    const total = segments.reduce((s, sg) => s + sg.count, 0);
+                    // Draw top→bottom: Modern (smallest) at top, Basic (largest) at bottom
+                    let cursor = stripTop;
+                    for (const sg of [...segments].reverse()) {
+                        const h = (sg.count / total) * STRIP_H;
+                        ctx.fillStyle = sg.color;
+                        ctx.fillRect(left, cursor, bar.width, h);
+                        cursor += h;
+                    }
+                }
+
+                // Single zigzag line
+                ctx.strokeStyle = '#8b949e';
+                ctx.lineWidth = 2;
+                ctx.lineJoin = 'miter';
                 ctx.beginPath();
-                const step = 6;
-                let px = x - halfW;
-                ctx.moveTo(px, zy + 3);
+                const step = 8;
+                let px = left;
                 let flip = 1;
-                while (px < x + halfW) {
-                    px += step;
-                    ctx.lineTo(Math.min(px, x + halfW), zy - 3 * flip);
+                ctx.moveTo(px, zy);
+                while (px < right) {
+                    px += step / 2;
+                    ctx.lineTo(Math.min(px, right), zy - amp * flip);
+                    px += step / 2;
+                    ctx.lineTo(Math.min(px, right), zy);
                     flip *= -1;
                 }
                 ctx.stroke();
+
+                // Actual value label above the bar
+                ctx.fillStyle = THEME.labelColor;
+                ctx.font = '12px Consolas, Menlo, Monaco, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(actualValue.toLocaleString(), x, top - 4);
             }
-
-            // Draw actual value label above the bar
-            ctx.fillStyle = THEME.labelColor;
-            ctx.font = `12px Consolas, Menlo, Monaco, monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(actualValue.toLocaleString(), x, top - 4);
-
             ctx.restore();
         }
     };
@@ -291,52 +321,65 @@ function renderChart1(tables) {
     });
 }
 
+const TIER_UPGRADES = new Set(['basic upgrade', 'advanced upgrade', 'modern upgrade']);
+
 function canBeUpgraded(record) {
-    const TIER_UPGRADES = new Set(['basic upgrade', 'advanced upgrade', 'modern upgrade']);
     return (record.AllowedUpgrades || []).some(u => TIER_UPGRADES.has(u.toLowerCase()));
 }
 
+function tierFromAllowed(record) {
+    for (const u of record.AllowedUpgrades || []) {
+        const ul = u.toLowerCase();
+        if (ul === 'modern upgrade')   return 'Modern';
+        if (ul === 'advanced upgrade') return 'Advanced';
+        if (ul === 'basic upgrade')    return 'Basic';
+    }
+    return 'Fixed';
+}
+
 function renderChart2(tables) {
-    const MULTIPLIERS = [1.0, 0.95, 0.90, 0.85, 0.80, 0.75];
-    // 'Empty' = upgradeable but no module installed; 'Fixed' = cannot accept upgrades
-    const TIERS = ['Fixed', 'Empty', 'Basic', 'Advanced', 'Modern'];
+    // X-axis: 7 bars — fixed-1.0, empty-1.0, then 0.95→0.75
+    // Index:     0          1            2    3    4    5    6
+    const X_LABELS = ['1.0 (fixed)', '1.0 (empty)', '0.95', '0.90', '0.85', '0.80', '0.75'];
+    const INSTALLED_MULTS = [0.95, 0.90, 0.85, 0.80, 0.75]; // indices 2–6
+
     const COLORS = {
         Fixed:    '#484f58',
-        Empty:    '#6e7681',
         Basic:    '#3fb950',
         Advanced: '#58a6ff',
         Modern:   '#bc8cff',
     };
-
-    // Build count matrix: [tier][multIndex]
-    const counts = {};
-    for (const tier of TIERS) counts[tier] = new Array(MULTIPLIERS.length).fill(0);
-
-    for (const t of tables) {
-        const mi = MULTIPLIERS.indexOf(t.SkillMultiplier);
-        if (mi === -1) continue;
-        const tier = classifyTier(t);
-        if (tier === 'None') {
-            // Distinguish: upgradeable-but-empty vs cannot-be-upgraded
-            counts[canBeUpgraded(t) ? 'Empty' : 'Fixed'][mi]++;
-        } else {
-            counts[tier][mi]++;
-        }
-    }
-
-    // Actual count for the 1.0 bar (for axis break label)
-    const actual10 = tables.filter(t => t.SkillMultiplier === 1.0).length;
-    const Y_MAX = 720;
-
     const LABELS = {
         Fixed:    'Not upgradeable',
-        Empty:    'No module installed',
         Basic:    'Basic upgrade',
         Advanced: 'Advanced upgrade',
         Modern:   'Modern upgrade',
     };
 
-    const datasets = TIERS
+    // counts[tier] has 7 slots matching X_LABELS
+    const counts = { Fixed: [0,0,0,0,0,0,0], Basic: [0,0,0,0,0,0,0], Advanced: [0,0,0,0,0,0,0], Modern: [0,0,0,0,0,0,0] };
+
+    for (const t of tables) {
+        if (t.SkillMultiplier === 1.0) {
+            if (!canBeUpgraded(t)) {
+                counts.Fixed[0]++;           // bar 0: fixed
+            } else {
+                const tier = tierFromAllowed(t);
+                counts[tier][1]++;           // bar 1: empty but upgradeable — colour by potential tier
+            }
+        } else {
+            const mi = INSTALLED_MULTS.indexOf(t.SkillMultiplier);
+            if (mi === -1) continue;
+            const tier = classifyTier(t);   // classifyTier returns Basic/Advanced/Modern for these
+            if (tier !== 'None') counts[tier][mi + 2]++;
+        }
+    }
+
+    const actualFixed = counts.Fixed[0];
+    const actualEmpty = counts.Basic[1] + counts.Advanced[1] + counts.Modern[1];
+    const Y_MAX = 720;
+
+    const datasets = ['Fixed', 'Basic', 'Advanced', 'Modern']
         .filter(tier => counts[tier].some(v => v > 0))
         .map(tier => ({
             label: LABELS[tier],
@@ -345,27 +388,43 @@ function renderChart2(tables) {
             borderWidth: 0,
         }));
 
-    const axisBreakPlugin = makeAxisBreakPlugin(0, actual10, Y_MAX);
+    // Bar totals per X index (for tooltip footer)
+    const barTotals = X_LABELS.map((_, xi) =>
+        ['Fixed','Basic','Advanced','Modern'].reduce((s, tier) => s + counts[tier][xi], 0)
+    );
+    barTotals[0] = actualFixed;
+    barTotals[1] = actualEmpty;
+
+    const axisBreakPlugin = makeAxisBreakPlugin([
+        { barIndex: 0, actualValue: actualFixed },
+        {
+            barIndex: 1,
+            actualValue: actualEmpty,
+            segments: [
+                { color: COLORS.Basic,    count: counts.Basic[1] },
+                { color: COLORS.Advanced, count: counts.Advanced[1] },
+                { color: COLORS.Modern,   count: counts.Modern[1] },
+            ].filter(s => s.count > 0),
+        },
+    ], Y_MAX);
 
     new Chart(document.getElementById('chart2'), {
         type: 'bar',
         plugins: [axisBreakPlugin],
-        data: {
-            labels: MULTIPLIERS.map(m => m.toFixed(2)),
-            datasets,
-        },
+        data: { labels: X_LABELS, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             scales: {
-                ...baseScales('Skill multiplier', 'Number of tables'),
+                ...baseScales(null, 'Number of tables'),
                 y: {
                     ...baseScales(null, 'Number of tables').y,
                     stacked: true,
                     max: Y_MAX,
                 },
                 x: {
-                    ...baseScales('Skill multiplier', null).x,
+                    ...baseScales(null, null).x,
                     stacked: true,
                 },
             },
@@ -373,14 +432,17 @@ function renderChart2(tables) {
                 ...basePlugins(true),
                 tooltip: {
                     ...basePlugins(true).tooltip,
+                    position: 'belowBreak',
+                    yAlign: 'top',      // tooltip opens downward from anchor
                     callbacks: {
-                        // Show real values even for the clipped bar
+                        // Show only non-zero segments; skip 0-value datasets
+                        label: (ctx) => {
+                            if (ctx.parsed.y === 0) return null;
+                            return `  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}`;
+                        },
                         footer: (items) => {
-                            const total = items.reduce((s, i) => s + i.parsed.y, 0);
-                            const mi = items[0]?.dataIndex;
-                            const mult = MULTIPLIERS[mi];
-                            const realTotal = mult === 1.0 ? actual10 : total;
-                            return `Total: ${realTotal}`;
+                            const total = barTotals[items[0]?.dataIndex];
+                            return `  Total: ${total.toLocaleString()}`;
                         },
                     },
                 },

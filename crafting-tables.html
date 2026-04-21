@@ -291,11 +291,18 @@ function renderChart1(tables) {
     });
 }
 
+function canBeUpgraded(record) {
+    const TIER_UPGRADES = new Set(['basic upgrade', 'advanced upgrade', 'modern upgrade']);
+    return (record.AllowedUpgrades || []).some(u => TIER_UPGRADES.has(u.toLowerCase()));
+}
+
 function renderChart2(tables) {
     const MULTIPLIERS = [1.0, 0.95, 0.90, 0.85, 0.80, 0.75];
-    const TIERS = ['None', 'Basic', 'Advanced', 'Modern'];
+    // 'Empty' = upgradeable but no module installed; 'Fixed' = cannot accept upgrades
+    const TIERS = ['Fixed', 'Empty', 'Basic', 'Advanced', 'Modern'];
     const COLORS = {
-        None:     '#6e7681',
+        Fixed:    '#484f58',
+        Empty:    '#6e7681',
         Basic:    '#3fb950',
         Advanced: '#58a6ff',
         Modern:   '#bc8cff',
@@ -308,17 +315,31 @@ function renderChart2(tables) {
     for (const t of tables) {
         const mi = MULTIPLIERS.indexOf(t.SkillMultiplier);
         if (mi === -1) continue;
-        counts[classifyTier(t)][mi]++;
+        const tier = classifyTier(t);
+        if (tier === 'None') {
+            // Distinguish: upgradeable-but-empty vs cannot-be-upgraded
+            counts[canBeUpgraded(t) ? 'Empty' : 'Fixed'][mi]++;
+        } else {
+            counts[tier][mi]++;
+        }
     }
 
     // Actual count for the 1.0 bar (for axis break label)
     const actual10 = tables.filter(t => t.SkillMultiplier === 1.0).length;
     const Y_MAX = 720;
 
+    const LABELS = {
+        Fixed:    'Not upgradeable',
+        Empty:    'No module installed',
+        Basic:    'Basic upgrade',
+        Advanced: 'Advanced upgrade',
+        Modern:   'Modern upgrade',
+    };
+
     const datasets = TIERS
         .filter(tier => counts[tier].some(v => v > 0))
         .map(tier => ({
-            label: tier === 'None' ? 'No module' : `${tier} upgrade`,
+            label: LABELS[tier],
             data: counts[tier],
             backgroundColor: COLORS[tier],
             borderWidth: 0,

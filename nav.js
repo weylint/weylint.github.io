@@ -11,6 +11,7 @@
     <div class="wt-nav-section">Economy</div>
     <a class="wt-nav-link" href="meteorstore.html" data-page="meteorstore.html">Meteor Store</a>
     <a class="wt-nav-link" href="dinnerparty.html" data-page="dinnerparty.html">Dinner Party</a>
+    <a class="wt-nav-link" href="crafting-tables.html" data-page="crafting-tables.html">Crafting Tables</a>
     <div class="wt-nav-section">Server</div>
     <a class="wt-nav-link" href="server-stats.html" data-page="server-stats.html">Server Stats</a>
     <a class="wt-nav-link wt-nav-external" href="https://weylint.github.io/ecoflow" target="_blank" rel="noopener">EcoFlow <span class="wt-nav-ext-icon">↗</span></a>

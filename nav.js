@@ -17,6 +17,16 @@
     <a class="wt-nav-link wt-nav-external" href="https://weylint.github.io/ecoflow" target="_blank" rel="noopener">EcoFlow <span class="wt-nav-ext-icon">↗</span></a>
     <div class="wt-nav-section">Help</div>
     <a class="wt-nav-link" href="help/howtogov.html" data-page="help/howtogov.html">How-To Gov</a>
+    <button class="wt-nav-submenu-toggle" data-submenu="docs">Documentation <span class="wt-nav-submenu-arrow">&#9662;</span></button>
+    <div class="wt-nav-submenu" id="wt-submenu-docs">
+        <a class="wt-nav-link wt-nav-sublink" href="law.html?doc=overview" data-page="law.html?doc=overview">Overview</a>
+        <a class="wt-nav-link wt-nav-sublink" href="law.html?doc=companies" data-page="law.html?doc=companies">Companies</a>
+        <a class="wt-nav-link wt-nav-sublink" href="law.html?doc=education-and-skill-scrolls" data-page="law.html?doc=education-and-skill-scrolls">Education &amp; Skill Scrolls</a>
+        <a class="wt-nav-link wt-nav-sublink" href="law.html?doc=government-guidelines" data-page="law.html?doc=government-guidelines">Government Guidelines</a>
+        <a class="wt-nav-link wt-nav-sublink" href="law.html?doc=labour-requirements" data-page="law.html?doc=labour-requirements">Labour Requirements</a>
+        <a class="wt-nav-link wt-nav-sublink" href="law.html?doc=towns-and-countries" data-page="law.html?doc=towns-and-countries">Towns &amp; Countries</a>
+        <a class="wt-nav-link wt-nav-sublink" href="law.html?doc=victory-conditions" data-page="law.html?doc=victory-conditions">Victory Conditions</a>
+    </div>
     <div class="wt-nav-section">White Tiger Law</div>
     <a class="wt-nav-link" href="laws.html" data-page="laws.html">Ingame Laws</a>
     <a class="wt-nav-link" href="election-diff.html" data-page="election-diff.html">Election Diff</a>
@@ -69,6 +79,43 @@
 }
 .wt-nav-external .wt-nav-ext-icon {
     color: #6e7681;
+}
+.wt-nav-submenu-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 7px 16px;
+    background: none;
+    border: none;
+    color: #8b949e;
+    font-size: 0.85rem;
+    font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+    cursor: pointer;
+    text-align: left;
+}
+.wt-nav-submenu-toggle:hover {
+    background: #1c2128;
+    color: #c9d1d9;
+}
+.wt-nav-submenu-toggle.wt-nav-submenu-open {
+    color: #c9d1d9;
+}
+.wt-nav-submenu-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.15s;
+}
+.wt-nav-submenu-toggle.wt-nav-submenu-open .wt-nav-submenu-arrow {
+    transform: rotate(180deg);
+}
+.wt-nav-submenu {
+    display: none;
+}
+.wt-nav-submenu.wt-nav-submenu-open {
+    display: block;
+}
+.wt-nav-sublink {
+    padding-left: 28px;
 }
 .wt-content {
     flex: 1;
@@ -216,6 +263,19 @@
                 isActive = page === currentFile;
             }
             if (isActive) a.classList.add('wt-nav-active');
+        });
+
+        // Submenu toggle
+        document.querySelectorAll('.wt-nav-submenu-toggle').forEach(function (btn) {
+            const submenu = document.getElementById('wt-submenu-' + btn.dataset.submenu);
+            if (submenu && submenu.querySelector('.wt-nav-active')) {
+                btn.classList.add('wt-nav-submenu-open');
+                submenu.classList.add('wt-nav-submenu-open');
+            }
+            btn.addEventListener('click', function () {
+                btn.classList.toggle('wt-nav-submenu-open');
+                submenu.classList.toggle('wt-nav-submenu-open');
+            });
         });
     });
 }());

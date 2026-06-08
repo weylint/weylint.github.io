@@ -428,7 +428,7 @@
         // ── Main ─────────────────────────────────────────────────────────────────
 
         function extractLawIds(actionOnComplete) {
-            const ids = [...actionOnComplete.matchAll(/view:360:(\d+)/g)].map(m => m[1]);
+            const ids = [...actionOnComplete.matchAll(/view:638:(\d+)/g)].map(m => m[1]);
             return ids.length === 2 ? [ids[0], ids[1]] : null;
         }
 

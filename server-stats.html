@@ -56,6 +56,18 @@
             display: none;
         }
 
+        .fallback-note {
+            background: #0d1117;
+            border-left: 3px solid #e3b341;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #e3b341;
+            display: none;
+        }
+
         .chart-card {
             background: #161b22;
             border: 1px solid #30363d;
@@ -94,6 +106,7 @@
         </header>
 
         <div id="error-banner" class="error-banner"></div>
+        <div id="fallback-note" class="fallback-note"></div>
 
         <div class="chart-card">
             <h2>Median Nutrition Value</h2>
@@ -123,6 +136,13 @@
             </div>
         </div>
 
+        <div class="chart-card">
+            <h2>Active Citizens <span style="color:#6e7681;font-size:0.8em">(active citizens as % of total population)</span></h2>
+            <div id="active-pct-wrap" class="chart-wrap">
+                <canvas id="active-pct-chart"></canvas>
+            </div>
+        </div>
+
         <!-- GDP chart disabled: endpoint returns no useful data
         <div class="chart-card">
             <h2>GDP</h2>
@@ -140,6 +160,10 @@
             { slug: 'coast-redwood',  name: 'Coast Redwood',  color: '#3fb950' },
             { slug: 'dusky-robin',    name: 'Dusky Robin',    color: '#e3b341' },
             { slug: 'giant-panda',    name: 'Giant Panda',    color: '#bc8cff' },
+            // Lumber Ridge: waiting on DNS/TLS for lumber-ridge.play.eco. Until then the raw
+            // endpoint below is used, but only when this page is opened locally over http:// or
+            // file:// — an https:// page cannot fetch it (mixed content).
+            { slug: 'lumber-ridge',   name: 'Lumber Ridge',   color: '#f0883e', fallbackBase: 'http://gs1.play.eco:3051' },
         ];
 
         const DATASETS = {
@@ -147,17 +171,43 @@
             housing:        'MedianHouseValueOfActiveCitizens',
             play:           'Play',
             activeCitizens: 'ActiveCitizenPopulation',
+            citizens:       'CitizenPopulation',
             gdp:            'GDP',
         };
 
-        async function fetchDataset(slug, dataSet) {
-            const url = `https://${slug}.play.eco/datasets/get?dataSet=${dataSet}`;
+        function serverBase(server) {
+            return server.base || `https://${server.slug}.play.eco`;
+        }
+
+        // An https:// page may only fetch https:// URLs, so plain-HTTP fallbacks are usable
+        // only when the page itself is served locally over http:// or opened from file://.
+        const ALLOW_INSECURE_FALLBACK = location.protocol !== 'https:';
+
+        // Servers that fell back to their local endpoint, reported in the banner.
+        const usedFallback = new Set();
+
+        async function fetchJson(url) {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return await r.json();
+        }
+
+        async function fetchDataset(server, dataSet) {
+            const path = `/datasets/get?dataSet=${dataSet}`;
             try {
-                const r = await fetch(url);
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                return await r.json();
+                return await fetchJson(`${serverBase(server)}${path}`);
             } catch {
-                return null;
+                // Primary host is missing or unreachable — try the local-only fallback.
+                const fallback = server.fallbackBase;
+                if (!fallback) return null;
+                if (!ALLOW_INSECURE_FALLBACK && fallback.startsWith('http://')) return null;
+                try {
+                    const data = await fetchJson(`${fallback}${path}`);
+                    usedFallback.add(server.name);
+                    return data;
+                } catch {
+                    return null;
+                }
             }
         }
 
@@ -166,7 +216,7 @@
             return Number.isInteger(d) ? `Day ${d}` : `Day ${d.toFixed(1)}`;
         }
 
-        function buildChart(canvasId, wrapId, serverResults, yLabel = 'Value') {
+        function buildChart(canvasId, wrapId, serverResults, yLabel = 'Value', suffix = '') {
             const wrap = document.getElementById(wrapId);
 
             const validResults = serverResults.filter(r => r.data !== null);
@@ -223,7 +273,7 @@
                             titleColor: '#c9d1d9',
                             bodyColor: '#8b949e',
                             callbacks: {
-                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) : 'N/A'}`,
+                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + suffix : 'N/A'}`,
                             }
                         }
                     },
@@ -258,11 +308,12 @@
 
         async function main() {
             const fetches = SERVERS.flatMap(server => [
-                fetchDataset(server.slug, DATASETS.nutrition).then(data => ({ server, key: 'nutrition', data })),
-                fetchDataset(server.slug, DATASETS.housing).then(data => ({ server, key: 'housing', data })),
-                fetchDataset(server.slug, DATASETS.play).then(data => ({ server, key: 'play', data })),
-                fetchDataset(server.slug, DATASETS.activeCitizens).then(data => ({ server, key: 'activeCitizens', data })),
-                // fetchDataset(server.slug, DATASETS.gdp).then(data => ({ server, key: 'gdp', data })),
+                fetchDataset(server, DATASETS.nutrition).then(data => ({ server, key: 'nutrition', data })),
+                fetchDataset(server, DATASETS.housing).then(data => ({ server, key: 'housing', data })),
+                fetchDataset(server, DATASETS.play).then(data => ({ server, key: 'play', data })),
+                fetchDataset(server, DATASETS.activeCitizens).then(data => ({ server, key: 'activeCitizens', data })),
+                fetchDataset(server, DATASETS.citizens).then(data => ({ server, key: 'citizens', data })),
+                // fetchDataset(server, DATASETS.gdp).then(data => ({ server, key: 'gdp', data })),
             ]);
 
             const results = await Promise.all(fetches);
@@ -275,10 +326,17 @@
                 banner.style.display = 'block';
             }
 
+            if (usedFallback.size > 0) {
+                const note = document.getElementById('fallback-note');
+                note.textContent = `Using local fallback endpoint for: ${[...usedFallback].join(', ')}`;
+                note.style.display = 'block';
+            }
+
             const nutritionResults     = results.filter(r => r.key === 'nutrition');
             const housingResults       = results.filter(r => r.key === 'housing');
             const playResults          = results.filter(r => r.key === 'play');
             const activeCitizenResults = results.filter(r => r.key === 'activeCitizens');
+            const citizenResults       = results.filter(r => r.key === 'citizens');
 
             // Compute Actions per Minute per Active Player (play values are per hour, /60 for per minute)
             const apmResults = SERVERS.map(server => {
@@ -300,10 +358,31 @@
                 return { server, data: { Times, Values } };
             });
 
+            // Active citizens as a percentage of total population
+            const activePctResults = SERVERS.map(server => {
+                const active = activeCitizenResults.find(r => r.server === server);
+                const total  = citizenResults.find(r => r.server === server);
+                if (!active?.data || !total?.data) return { server, data: null };
+
+                const totalIndex = new Map(total.data.Times.map((t, i) => [t, i]));
+                const Times  = [];
+                const Values = [];
+                active.data.Times.forEach((t, i) => {
+                    const ti = totalIndex.get(t);
+                    if (ti === undefined) return;
+                    const pop = total.data.Values[ti];
+                    if (!pop) return; // day 0 has a population of 0
+                    Times.push(t);
+                    Values.push((active.data.Values[i] / pop) * 100);
+                });
+                return { server, data: { Times, Values } };
+            });
+
             buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults, 'Skill Points');
             buildChart('housing-chart',   'housing-wrap',   housingResults,   'Skill Points');
             buildChart('actions-chart',   'actions-wrap',   playResults,      'Actions per Hour');
             buildChart('apm-chart',       'apm-wrap',       apmResults,       'Actions / min / player');
+            buildChart('active-pct-chart', 'active-pct-wrap', activePctResults, '% of citizens active', '%');
             // buildChart('gdp-chart',    'gdp-wrap',       results.filter(r => r.key === 'gdp'), 'GDP');
         }
 

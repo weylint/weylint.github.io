@@ -4,6 +4,10 @@ Base URL: `https://white-tiger.play.eco/api/v1/laws`
 
 No shared JS module — called directly via `fetch`.
 
+`white-tiger.play.eco` sits behind Cloudflare, so command-line tools get a `403` challenge page.
+The same API is reachable unproxied over plain HTTP at `http://gs1.play.eco:3041/api/v1/...` —
+use that when inspecting data from a shell. Pages keep using the HTTPS host (browsers pass the challenge).
+
 ---
 
 ## `GET /laws`
@@ -33,7 +37,7 @@ Returns all laws on the server (including removed ones).
 |-------|------|-------|
 | `Id` | number | Unique law ID. Use with `/laws/{id}` to fetch a single law. |
 | `Name` | string | Display name of the law. |
-| `State` | string | `"Active"`, `"Proposed"`, or `"Removed"`. Filter out `"Removed"` for display. |
+| `State` | string | `"Active"`, `"Proposed"`, `"Draft"`, or `"Removed"`. Filter out `"Removed"` for display. A `"Draft"` is an unproposed working copy. The API exposes no parent id, so `draft-diff.html` matches a draft back to its live law by `Name`: Eco names a draft `"<Parent Name> Revision"` (with a number once there has been more than one). Drafts that match nothing are brand-new laws. |
 | `Creator` | string | Player who created the law. |
 | `UserDescription` | string | Human-readable summary written by the creator. May contain Eco rich-text markup. |
 | `Description` | string | Full machine-generated law text. Contains Eco rich-text markup and structured law code (`on event`, `if`, `then`, etc.). |

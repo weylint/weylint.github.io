@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draft Diff - White Tiger</title>
+    <script src="nav.js?v=3"></script>
+    <link rel="stylesheet" href="law-diff.css">
+    <script src="law-diff.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: min(1600px, 100%); margin: 0 auto; }
+
+        /* Prose and controls stay narrow; only diffs use the full width. */
+        header, .toolbar, .error-banner { max-width: 900px; }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 { color: #58a6ff; margin-bottom: 6px; }
+        header > p { color: #8b949e; font-size: 0.875rem; }
+
+        .error-banner {
+            background: #0d1117;
+            border: 1px solid #6e3030;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #f85149;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+        }
+
+        .loading .spinner {
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid #30363d;
+            border-top-color: #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .no-data {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+            font-size: 0.875rem;
+        }
+
+        /* ── Toolbar ────────────────────────────────────────── */
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar input {
+            flex: 1;
+            min-width: 200px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #c9d1d9;
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 8px 12px;
+        }
+
+        .toolbar input:focus { outline: none; border-color: #58a6ff; }
+
+        .toolbar button {
+            background: none;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #8b949e;
+            font-family: inherit;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .toolbar button:hover { border-color: #58a6ff; color: #58a6ff; }
+        .toolbar .count { color: #6e7681; font-size: 0.8rem; }
+
+        /* ── Draft card ─────────────────────────────────────── */
+
+        .draft-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .draft-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 20px;
+            border-bottom: 1px solid #30363d;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .draft-header:hover { background: #1c2128; }
+
+        .caret {
+            color: #6e7681;
+            font-size: 0.7rem;
+            width: 10px;
+            flex-shrink: 0;
+            transition: transform 0.15s;
+        }
+
+        .draft-card.collapsed .caret { transform: rotate(-90deg); }
+        .draft-card.collapsed .draft-body { display: none; }
+        .draft-card.collapsed .draft-header { border-bottom: none; }
+
+        .state-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid;
+            flex-shrink: 0;
+        }
+
+        .draft-name { color: #c9d1d9; font-size: 0.95rem; }
+
+        .draft-chip {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #58a6ff;
+            border: 1px solid #58a6ff22;
+            background: #58a6ff11;
+            flex-shrink: 0;
+        }
+
+        /* ±counts — the size of the change, without expanding the card */
+        .delta {
+            font-size: 0.8rem;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .delta .ins { color: #3fb950; }
+        .delta .del { color: #f85149; margin-left: 6px; }
+
+        .draft-creator { color: #6e7681; font-size: 0.8rem; margin-left: auto; }
+
+        .ud-label {
+            font-size: 0.72rem;
+            color: #6e7681;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 10px 14px 4px;
+            background: #0d1117;
+            border-top: 1px solid #30363d;
+        }
+
+        .footnote {
+            color: #6e7681;
+            font-size: 0.78rem;
+            padding: 4px 0 20px;
+            line-height: 1.8;
+            max-width: 900px;
+        }
+
+        .footnote strong { color: #8b949e; font-weight: normal; }
+        .footnote a { color: #6e7681; text-decoration: none; }
+        .footnote a:hover { color: #58a6ff; text-decoration: underline; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Draft Diff</h1>
+            <p>Active laws that have a draft revision pending, and what the draft changes.</p>
+        </header>
+        <div id="error-banner" class="error-banner"></div>
+        <div id="toolbar" class="toolbar" style="display:none">
+            <input id="filter" type="text" placeholder="Filter by law name or creator&hellip;">
+            <button id="expand-all">Expand all</button>
+            <button id="collapse-all">Collapse all</button>
+            <span id="count" class="count"></span>
+        </div>
+        <div id="main">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading laws&hellip;</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'https://white-tiger.play.eco/api/v1';
+
+        // A draft is the editable working copy of a law. Match it back to the
+        // live law it was branched from — the API exposes no parent id, so the
+        // law Name is the only link available.
+        const DRAFT_STATES = ['Draft'];
+        const LIVE_STATES   = ['Active', 'Proposed'];
+
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function stateColor(state) {
+            if (state === 'Active')   return '#3fb950';
+            if (state === 'Proposed') return '#e3b341';
+            if (state === 'Draft')    return '#58a6ff';
+            return '#6e7681';
+        }
+
+        function normName(name) {
+            return String(name || '').trim().toLowerCase();
+        }
+
+        // Eco names a draft after the law it was branched from, suffixed with
+        // "Revision" (and a number once there has been more than one), e.g.
+        // "[C] Universal Basic Income" -> "[C] Universal Basic Income Revision".
+        // Some clients decorate with "(Draft)"/"Copy of" instead.
+        function baseName(draftName) {
+            const stripped = String(draftName || '')
+                .replace(/\s*\((draft|copy)\)\s*$/i, '')
+                .replace(/^\s*copy of\s+/i, '')
+                .replace(/\s+revision(\s+\d+)?\s*$/i, '');
+            return normName(stripped);
+        }
+
+        // Pair every draft law with the live law of the same name.
+        function pairDrafts(laws) {
+            const live = laws.filter(l => LIVE_STATES.includes(l.State));
+            const byName = new Map();
+            for (const l of live) {
+                const k = normName(l.Name);
+                // Prefer Active over Proposed when both exist under one name.
+                if (!byName.has(k) || (l.State === 'Active' && byName.get(k).State !== 'Active'))
+                    byName.set(k, l);
+            }
+
+            const pairs = [];
+            const unmatched = [];
+            for (const draft of laws.filter(l => DRAFT_STATES.includes(l.State))) {
+                // Exact name first (a draft may keep the parent's name verbatim),
+                // then the name with the "Revision" suffix stripped.
+                const base = byName.get(normName(draft.Name)) || byName.get(baseName(draft.Name));
+                if (base && base.Id !== draft.Id) pairs.push({base, draft});
+                else unmatched.push(draft);
+            }
+
+            pairs.sort((a, b) => a.base.Name.localeCompare(b.base.Name));
+            unmatched.sort((a, b) => a.Name.localeCompare(b.Name));
+            return {pairs, unmatched};
+        }
+
+        function renderPair({base, draft}) {
+            const color = stateColor(base.State);
+            const badge = `<span class="state-badge" style="color:${color};border-color:${color}22;background:${color}11">${escapeHtml(base.State)}</span>`;
+
+            const oldDesc = LawDiff.preprocessEcoLines(base.Description);
+            const newDesc = LawDiff.preprocessEcoLines(draft.Description);
+            const {del, ins} = LawDiff.countChanges(oldDesc, newDesc);
+
+            const delta = `<span class="delta">`
+                + `<span class="ins">+${ins}</span><span class="del">\u2212${del}</span></span>`;
+
+            let userSection = '';
+            if ((base.UserDescription || '') !== (draft.UserDescription || '')) {
+                const oldUD = LawDiff.preprocessEcoLines(base.UserDescription);
+                const newUD = LawDiff.preprocessEcoLines(draft.UserDescription);
+                userSection = `
+                    <div class="ud-label">Description</div>
+                    <div class="diff-split-wrap"><div class="diff-split">${LawDiff.renderSplitBlock(oldUD, newUD)}</div></div>
+                `;
+            }
+
+            // Column header doubles as the link row, so the old separate
+            // pair-header (which just repeated the law name) is gone.
+            const head = `
+                <div class="sp-head">
+                    <div>Active &middot; <a href="law-view.html?id=${base.Id}">#${base.Id}</a></div>
+                    <div>Draft &middot; <a href="law-view.html?id=${draft.Id}">#${draft.Id}</a></div>
+                </div>`;
+
+            const searchKey = `${draft.Name} ${base.Name} ${draft.Creator || ''} ${base.Creator || ''}`.toLowerCase();
+
+            return `
+                <div class="draft-card" data-search="${escapeHtml(searchKey)}">
+                    <div class="draft-header">
+                        <span class="caret">&#9660;</span>
+                        ${badge}
+                        <span class="draft-name">${escapeHtml(base.Name)}</span>
+                        <span class="draft-chip">draft</span>
+                        ${delta}
+                        <span class="draft-creator">by ${escapeHtml(draft.Creator || 'unknown')}</span>
+                    </div>
+                    <div class="draft-body">
+                        ${userSection}
+                        ${head}
+                        <div class="diff-split-wrap"><div class="diff-split">${LawDiff.renderSplitBlock(oldDesc, newDesc)}</div></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Drafts that need no diff — either identical to their live law, or brand-new
+        // laws with nothing to compare against. Listed rather than hidden outright.
+        function renderFootnoteList(label, laws) {
+            if (!laws.length) return '';
+            const links = laws
+                .map(l => `<a href="law-view.html?id=${l.Id}">${escapeHtml(l.Name)}</a>`)
+                .join(', ');
+            return `<div class="footnote"><strong>${laws.length} ${label}:</strong> ${links}</div>`;
+        }
+
+        function wireInteractions(container, changed, untouched, unmatched) {
+            container.addEventListener('click', e => {
+                const header = e.target.closest('.draft-header');
+                if (!header || e.target.closest('a')) return;
+                header.parentElement.classList.toggle('collapsed');
+            });
+
+            const toolbar = document.getElementById('toolbar');
+            toolbar.style.display = 'flex';
+
+            const cards = [...container.querySelectorAll('.draft-card')];
+            document.getElementById('count').textContent =
+                `${changed.length} revised law${changed.length === 1 ? '' : 's'}`
+                + (untouched.length ? ` \u00b7 ${untouched.length} identical` : '')
+                + (unmatched.length ? ` \u00b7 ${unmatched.length} new` : '');
+
+            document.getElementById('filter').addEventListener('input', e => {
+                const q = e.target.value.trim().toLowerCase();
+                for (const c of cards)
+                    c.style.display = !q || c.dataset.search.includes(q) ? '' : 'none';
+            });
+
+            document.getElementById('expand-all').addEventListener('click',
+                () => cards.forEach(c => c.classList.remove('collapsed')));
+            document.getElementById('collapse-all').addEventListener('click',
+                () => cards.forEach(c => c.classList.add('collapsed')));
+        }
+
+        async function main() {
+            const container = document.getElementById('main');
+            const banner    = document.getElementById('error-banner');
+
+            try {
+                const laws = await fetch(`${API}/laws`)
+                    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+
+                const {pairs, unmatched} = pairDrafts(laws);
+
+                // Most drafts are byte-identical to their live law. Only the ones
+                // that actually changed something earn a card.
+                const changed = [], untouched = [];
+                for (const p of pairs) {
+                    const differs = !LawDiff.isIdentical(p.base.Description, p.draft.Description)
+                        || (p.base.UserDescription || '') !== (p.draft.UserDescription || '');
+                    (differs ? changed : untouched).push(differs ? p : p.draft);
+                }
+
+                if (changed.length === 0 && !untouched.length && !unmatched.length) {
+                    const anyDraft = laws.some(l => DRAFT_STATES.includes(l.State));
+                    container.innerHTML = `<div class="no-data">${
+                        anyDraft
+                            ? 'Drafts exist, but none of them match an active or proposed law by name.'
+                            : 'No draft laws on the server right now.'
+                    }</div>`;
+                    return;
+                }
+
+                container.innerHTML =
+                      (changed.length ? changed.map(renderPair).join('')
+                                      : '<div class="no-data">No draft currently changes its law.</div>')
+                    + renderFootnoteList('draft' + (untouched.length === 1 ? ' is' : 's are')
+                        + ' identical to their active law', untouched)
+                    + renderFootnoteList('new draft' + (unmatched.length === 1 ? '' : 's')
+                        + ' with no live law to diff against', unmatched);
+
+                wireInteractions(container, changed, untouched, unmatched);
+
+            } catch (err) {
+                banner.textContent = `Could not load laws: ${err.message}`;
+                banner.style.display = 'block';
+                container.innerHTML = '';
+            }
+        }
+
+        main();
+    </script>
+</body>
+</html>

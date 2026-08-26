@@ -1,0 +1,150 @@
+/*
+ * law-diff.css — styles for the shared law diff renderer in `law-diff.js`.
+ *
+ * Linked by election-diff.html and draft-diff.html so both pages render diffs
+ * identically. Split-view classes (.sp-*) match the markup emitted by
+ * LawDiff.renderSplitBlock(); .eco-* classes match LawDiff.colorLine().
+ */
+
+/* ── Split diff ─────────────────────────────────────── */
+
+.diff-split-wrap {
+    overflow-x: auto;
+    background: #0d1117;
+    border-top: 1px solid #30363d;
+    font-size: 0.82rem;
+}
+
+.diff-split { min-width: 760px; }
+
+.sp-head {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+}
+
+.sp-head > div {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 14px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6e7681;
+}
+
+.sp-head > div + div { border-left: 1px solid #30363d; }
+.sp-head a { color: #8b949e; text-decoration: none; }
+.sp-head a:hover { color: #58a6ff; text-decoration: underline; }
+
+.sp-row { display: flex; }
+
+.sp-cell {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    line-height: 1.7;
+    padding-right: 12px;
+}
+
+.sp-new { border-left: 1px solid #30363d; }
+.sp-del { background: rgba(248, 81, 73, 0.12); }
+.sp-ins { background: rgba(63, 185, 80, 0.12); }
+.sp-empty { background: #10151c; }
+
+.sp-g {
+    flex-shrink: 0;
+    width: 24px;
+    text-align: center;
+    color: #6e7681;
+    user-select: none;
+    font-size: 0.85em;
+    padding-top: 2px;
+}
+
+.sp-g-del { color: #f85149; }
+.sp-g-ins { color: #3fb950; }
+
+/* Law lines run to ~1600 chars, so cells must wrap. Both cells sit in the
+   same flex row, so the row height follows the taller side and the two
+   columns stay in step. */
+.sp-c {
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.sp-collapsed {
+    color: #6e7681;
+    font-size: 0.78rem;
+    padding: 3px 0 3px 38px;
+    background: #0d1117;
+    border-top: 1px solid #21262d;
+    border-bottom: 1px solid #21262d;
+}
+
+.diff-identical {
+    padding: 8px 14px;
+    color: #6e7681;
+    font-size: 0.8rem;
+}
+
+/* ── Eco markup styles ──────────────────────────────── */
+
+.eco-hdr        { color: #58a6ff; font-weight: bold; }
+.eco-govt       { color: #e3b341; }
+.eco-currency   { color: #3fb950; }
+.eco-bank       { color: #58a6ff; }
+.eco-positive   { color: #3fb950; }
+.eco-comment    { color: #6a9955; font-style: italic; }
+
+.eco-kw-event   { color: #c586c0; }
+.eco-kw-then    { color: #4ec9b0; }
+.eco-kw-cond    { color: #c586c0; }
+.eco-kw-op      { color: #569cd6; }
+
+.eco-chip {
+    display: inline-block;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 0.8em;
+    color: #c9d1d9;
+    margin: 0 1px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.eco-foldout { position: relative; display: inline-block; }
+
+.eco-foldout-label {
+    color: #58a6ff;
+    font-size: 0.8em;
+    border-bottom: 1px dotted #58a6ff;
+    cursor: default;
+}
+
+.eco-foldout-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    z-index: 100;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-width: 400px;
+    max-width: 700px;
+    font-size: 0.8rem;
+    color: #8b949e;
+    line-height: 1.8;
+    white-space: normal;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+.eco-foldout:hover .eco-foldout-tooltip { display: block; }

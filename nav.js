@@ -30,6 +30,7 @@
     <div class="wt-nav-section">White Tiger Law</div>
     <a class="wt-nav-link" href="laws.html" data-page="laws.html">Ingame Laws</a>
     <a class="wt-nav-link" href="election-diff.html" data-page="election-diff.html">Election Diff</a>
+    <a class="wt-nav-link" href="draft-diff.html" data-page="draft-diff.html">Draft Diff</a>
     <a class="wt-nav-link" href="custom-stats.html" data-page="custom-stats.html">Custom Stats</a>
     <a class="wt-nav-link" href="law.html?doc=server-rules" data-page="law.html?doc=server-rules">Server Rules</a>
     <a class="wt-nav-link" href="law.html?doc=constitution" data-page="law.html?doc=constitution">Constitution</a>

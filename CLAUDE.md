@@ -13,6 +13,10 @@ No build system. Plain HTML files with inline `<script>` tags, served via GitHub
 | `transport.html` | Transport profit calculator |
 | `laws.html` | Ingame law list — Eco markup renderer, collapsible full law text |
 | `law-view.html` | Single-law detail page (`?id=XXXXX`), linked from laws.html |
+| `election-diff.html` | Side-by-side diff for active elections proposing law changes |
+| `draft-diff.html` | Side-by-side diff for laws with an unproposed draft; hides drafts identical to their law |
+| `law-diff.js` | Shared Eco law diff module — `LawDiff.preprocessEcoLines()` / `.renderSplitBlock()` / `.countChanges()` / `.isIdentical()` — used by `election-diff.html` and `draft-diff.html` |
+| `law-diff.css` | Styles for the markup `law-diff.js` emits (`.sp-*` split view, `.eco-*` markup). Link it wherever `law-diff.js` is used |
 | `custom-stats.html` | Overview of custom stats written/read across all laws |
 | `nav.js` | Shared left-nav sidebar injected on every page |
 | `white-tiger-api.js` | Shared API module — `WhiteTigerAPI.fetchRecipes()` / `.fetchStores()` / `.fetchAllItems()` |
@@ -73,5 +77,6 @@ All pages use the same dark GitHub-style theme.
 
 - Keep JS logic inside the HTML file unless it is genuinely reusable across pages — then extract it to a shared `.js` module.
 - Pure algorithms go in their own `.js` file with a matching `.test.html` in-browser test page.
+- A shared `.js` module that emits HTML ships its styles in a matching `.css` file (see `law-diff.js` / `law-diff.css`) so pages using it cannot drift apart.
 - Do not introduce a build tool, bundler, or npm.
 - `eco-render.js` must sanitise all Eco `<color>` tags before inserting into the DOM (XSS prevention).

@@ -345,12 +345,18 @@
                             type: 'linear',
                             min: 0,
                             max: Math.ceil(maxDay),
+                            // Label whole days only; Chart.js would otherwise pick fractional steps.
+                            afterBuildTicks: axis => {
+                                const step = axis.max <= 18 ? 1 : 2;
+                                const ticks = [];
+                                for (let d = 0; d <= axis.max; d += step) ticks.push({ value: d });
+                                axis.ticks = ticks;
+                            },
                             ticks: {
                                 color: '#8b949e',
                                 font: { family: 'Consolas, Menlo, Monaco, monospace', size: 11 },
-                                maxTicksLimit: 20,
-                                stepSize: 1,
-                                callback: v => Number.isInteger(v) ? `Day ${v}` : '',
+                                autoSkip: false,
+                                callback: v => `Day ${v}`,
                             },
                             grid: { color: '#21262d' },
                             border: { color: '#30363d' },

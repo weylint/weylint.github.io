@@ -68,6 +68,27 @@
             display: none;
         }
 
+        .chart-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #8b949e;
+        }
+
+        .chart-options label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .chart-options input {
+            accent-color: #58a6ff;
+            cursor: pointer;
+        }
+
         .chart-card {
             background: #161b22;
             border: 1px solid #30363d;
@@ -108,6 +129,13 @@
         <div id="error-banner" class="error-banner"></div>
         <div id="fallback-note" class="fallback-note"></div>
 
+        <div class="chart-options">
+            <label>
+                <input type="checkbox" id="daily-toggle" checked>
+                Daily resolution (freshly restarted servers report hourly samples)
+            </label>
+        </div>
+
         <div class="chart-card">
             <h2>Median Nutrition Value</h2>
             <div id="nutrition-wrap" class="chart-wrap">
@@ -140,6 +168,13 @@
             <h2>Active Citizens <span style="color:#6e7681;font-size:0.8em">(active citizens as % of total population)</span></h2>
             <div id="active-pct-wrap" class="chart-wrap">
                 <canvas id="active-pct-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h2>Total Population <span style="color:#6e7681;font-size:0.8em">(total citizens registered on the server)</span></h2>
+            <div id="population-wrap" class="chart-wrap">
+                <canvas id="population-chart"></canvas>
             </div>
         </div>
 
@@ -211,13 +246,37 @@
             }
         }
 
-        function formatDay(seconds) {
-            const d = seconds / 86400;
-            return Number.isInteger(d) ? `Day ${d}` : `Day ${d.toFixed(1)}`;
+        function formatDay(days) {
+            return Number.isInteger(days) ? `Day ${days}` : `Day ${days.toFixed(2)}`;
         }
 
-        function buildChart(canvasId, wrapId, serverResults, yLabel = 'Value', suffix = '') {
+        // Long-running servers sample once a day; a freshly restarted one (White Tiger restarts
+        // weekly) samples hourly. Keep only the samples that land on a day boundary so every
+        // server is plotted at the same resolution. Series that cannot be reduced this way
+        // (fewer than two samples survive) are returned untouched.
+        function toDaily(data) {
+            const Times = [];
+            const Values = [];
+            const seen = new Set();
+            data.Times.forEach((t, i) => {
+                const day = Math.round(t / 86400);
+                if (Math.abs(t - day * 86400) > 1800) return;  // not on a day boundary
+                if (seen.has(day)) return;
+                seen.add(day);
+                Times.push(day * 86400);
+                Values.push(data.Values[i]);
+            });
+            if (Times.length < 2 && data.Times.length >= 2) return data;
+            return { Times, Values };
+        }
+
+        const chartInstances = new Map();
+
+        function buildChart(canvasId, wrapId, serverResults, yLabel = 'Value', suffix = '', decimals = 1) {
             const wrap = document.getElementById(wrapId);
+
+            chartInstances.get(canvasId)?.destroy();
+            chartInstances.delete(canvasId);
 
             const validResults = serverResults.filter(r => r.data !== null);
             if (validResults.length === 0) {
@@ -225,39 +284,42 @@
                 return;
             }
 
-            // Build unified sorted label set (day values in seconds), capped at day 36
-            const MAX_SECONDS = 36 * 86400;
-            const allTimes = new Set();
-            validResults.forEach(({ data }) => data.Times.forEach(t => { if (t <= MAX_SECONDS) allTimes.add(t); }));
-            const sortedTimes = [...allTimes].sort((a, b) => a - b);
-            const labels = sortedTimes.map(formatDay);
+            const dailyOnly = document.getElementById('daily-toggle').checked;
+            const MAX_DAYS = 36;
 
+            // Plot against elapsed days on a linear axis. A shared category axis would give every
+            // sample the same width, so an hourly-sampling server would stretch its first day or
+            // two across a large slice of the chart.
             const chartDatasets = validResults.map(({ server, data }) => {
-                const timeIndex = new Map(data.Times.map((t, i) => [t, i]));
-                const values = sortedTimes.map(t => {
-                    const i = timeIndex.get(t);
-                    return i !== undefined ? data.Values[i] : null;
+                const series = dailyOnly ? toDaily(data) : data;
+                const points = [];
+                series.Times.forEach((t, i) => {
+                    const day = t / 86400;
+                    if (day > MAX_DAYS) return;
+                    points.push({ x: day, y: series.Values[i] });
                 });
                 return {
                     label: server.name,
-                    data: values,
+                    data: points,
                     borderColor: server.color,
                     backgroundColor: server.color + '22',
                     borderWidth: 2,
-                    pointRadius: 2,
+                    pointRadius: points.length > 60 ? 0 : 2,
                     pointHoverRadius: 5,
                     tension: 0.3,
                     spanGaps: true,
                 };
             });
 
-            new Chart(document.getElementById(canvasId), {
+            const maxDay = Math.max(...chartDatasets.flatMap(d => d.data.map(p => p.x)), 1);
+
+            const chart = new Chart(document.getElementById(canvasId), {
                 type: 'line',
-                data: { labels, datasets: chartDatasets },
+                data: { datasets: chartDatasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
                     plugins: {
                         legend: {
                             labels: {
@@ -273,16 +335,22 @@
                             titleColor: '#c9d1d9',
                             bodyColor: '#8b949e',
                             callbacks: {
-                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + suffix : 'N/A'}`,
+                                title: items => items.length ? formatDay(items[0].parsed.x) : '',
+                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(decimals) + suffix : 'N/A'}`,
                             }
                         }
                     },
                     scales: {
                         x: {
+                            type: 'linear',
+                            min: 0,
+                            max: Math.ceil(maxDay),
                             ticks: {
                                 color: '#8b949e',
                                 font: { family: 'Consolas, Menlo, Monaco, monospace', size: 11 },
                                 maxTicksLimit: 20,
+                                stepSize: 1,
+                                callback: v => Number.isInteger(v) ? `Day ${v}` : '',
                             },
                             grid: { color: '#21262d' },
                             border: { color: '#30363d' },
@@ -304,6 +372,8 @@
                     }
                 }
             });
+
+            chartInstances.set(canvasId, chart);
         }
 
         async function main() {
@@ -378,12 +448,18 @@
                 return { server, data: { Times, Values } };
             });
 
-            buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults, 'Skill Points');
-            buildChart('housing-chart',   'housing-wrap',   housingResults,   'Skill Points');
-            buildChart('actions-chart',   'actions-wrap',   playResults,      'Actions per Hour');
-            buildChart('apm-chart',       'apm-wrap',       apmResults,       'Actions / min / player');
-            buildChart('active-pct-chart', 'active-pct-wrap', activePctResults, '% of citizens active', '%');
-            // buildChart('gdp-chart',    'gdp-wrap',       results.filter(r => r.key === 'gdp'), 'GDP');
+            function render() {
+                buildChart('nutrition-chart', 'nutrition-wrap', nutritionResults, 'Skill Points');
+                buildChart('housing-chart',   'housing-wrap',   housingResults,   'Skill Points');
+                buildChart('actions-chart',   'actions-wrap',   playResults,      'Actions per Hour');
+                buildChart('apm-chart',       'apm-wrap',       apmResults,       'Actions / min / player');
+                buildChart('active-pct-chart', 'active-pct-wrap', activePctResults, '% of citizens active', '%');
+                buildChart('population-chart', 'population-wrap', citizenResults, 'Citizens', '', 0);
+                // buildChart('gdp-chart',    'gdp-wrap',       results.filter(r => r.key === 'gdp'), 'GDP');
+            }
+
+            document.getElementById('daily-toggle').addEventListener('change', render);
+            render();
         }
 
         main();

@@ -15,6 +15,7 @@ No build system. Plain HTML files with inline `<script>` tags, served via GitHub
 | `law-view.html` | Single-law detail page (`?id=XXXXX`), linked from laws.html |
 | `election-diff.html` | Side-by-side diff for active elections proposing law changes |
 | `draft-diff.html` | Side-by-side diff for laws with an unproposed draft; hides drafts identical to their law |
+| `law-compare.html` | Free-form diff of any two laws (`?a=ID&b=ID`); pairs sections by header name, exact then fuzzy |
 | `law-diff.js` | Shared Eco law diff module — `LawDiff.preprocessEcoLines()` / `.renderSplitBlock()` / `.countChanges()` / `.isIdentical()` — used by `election-diff.html` and `draft-diff.html` |
 | `law-diff.css` | Styles for the markup `law-diff.js` emits (`.sp-*` split view, `.eco-*` markup). Link it wherever `law-diff.js` is used |
 | `custom-stats.html` | Overview of custom stats written/read across all laws |

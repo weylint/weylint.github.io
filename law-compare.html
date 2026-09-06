@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Law Compare - White Tiger</title>
+    <script src="nav.js?v=4"></script>
+    <link rel="stylesheet" href="law-diff.css">
+    <script src="law-diff.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: min(1600px, 100%); margin: 0 auto; }
+
+        /* Prose and controls stay narrow; only diffs use the full width. */
+        header, .error-banner { max-width: 900px; }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 { color: #58a6ff; margin-bottom: 6px; }
+        header > p { color: #8b949e; font-size: 0.875rem; }
+
+        .error-banner {
+            background: #0d1117;
+            border: 1px solid #6e3030;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #f85149;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+        }
+
+        .loading .spinner {
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid #30363d;
+            border-top-color: #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .no-data {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6e7681;
+            font-size: 0.875rem;
+        }
+
+        /* ── Law pickers ────────────────────────────────────── */
+
+        .pickers {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 16px;
+        }
+
+        .picker label {
+            display: block;
+            font-size: 0.72rem;
+            color: #6e7681;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+
+        select, .toolbar input {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #c9d1d9;
+            font-family: inherit;
+            font-size: 0.8rem;
+            padding: 8px 10px;
+        }
+
+        select:focus, .toolbar input:focus { outline: none; border-color: #58a6ff; }
+        optgroup { color: #8b949e; background: #161b22; }
+        option { color: #c9d1d9; background: #0d1117; }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .toolbar input { max-width: 280px; }
+
+        .toolbar button, .swap {
+            background: none;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #8b949e;
+            font-family: inherit;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .toolbar button:hover, .swap:hover { border-color: #58a6ff; color: #58a6ff; }
+        .toolbar .count { color: #6e7681; font-size: 0.8rem; }
+
+        .toolbar label.check {
+            color: #8b949e;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        /* ── Section card ───────────────────────────────────── */
+
+        .sec-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .sec-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 20px;
+            border-bottom: 1px solid #30363d;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .sec-header:hover { background: #1c2128; }
+
+        .caret {
+            color: #6e7681;
+            font-size: 0.7rem;
+            width: 10px;
+            flex-shrink: 0;
+            transition: transform 0.15s;
+        }
+
+        .sec-card.collapsed .caret { transform: rotate(-90deg); }
+        .sec-card.collapsed .sec-body { display: none; }
+        .sec-card.collapsed .sec-header { border-bottom: none; }
+
+        .sec-num {
+            color: #6e7681;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+            min-width: 3.5em;
+            text-align: right;
+        }
+
+        .sec-num.moved { color: #e3b341; }
+        .sec-num .gone { color: #6e7681; }
+
+        .sec-name { color: #c9d1d9; font-size: 0.95rem; }
+        .sec-name .alt { color: #8b949e; }
+        .sec-name .arrow { color: #6e7681; margin: 0 6px; }
+        .sec-num .arrow { color: #6e7681; margin: 0 3px; }
+
+        .chip {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid;
+            flex-shrink: 0;
+        }
+
+        .chip-fuzzy    { color: #e3b341; border-color: #e3b34122; background: #e3b34111; }
+        .chip-only-old { color: #f85149; border-color: #f8514922; background: #f8514911; }
+        .chip-only-new { color: #3fb950; border-color: #3fb95022; background: #3fb95011; }
+        .chip-same     { color: #6e7681; border-color: #6e768122; background: #6e768111; }
+
+        .delta {
+            font-size: 0.8rem;
+            flex-shrink: 0;
+            white-space: nowrap;
+            margin-left: auto;
+        }
+
+        .delta .ins { color: #3fb950; }
+        .delta .del { color: #f85149; margin-left: 6px; }
+
+        .ud-label {
+            font-size: 0.72rem;
+            color: #6e7681;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 10px 14px 4px;
+            background: #0d1117;
+            border-top: 1px solid #30363d;
+        }
+
+        .footnote {
+            color: #6e7681;
+            font-size: 0.78rem;
+            padding: 4px 0 20px;
+            line-height: 1.8;
+            max-width: 900px;
+        }
+
+        .footnote strong { color: #8b949e; font-weight: normal; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Law Compare</h1>
+            <p>Diff any two laws against each other, section by section. Sections are paired by
+               header name &mdash; exact first, then a best-effort fuzzy match on title and content.</p>
+        </header>
+        <div id="error-banner" class="error-banner"></div>
+
+        <div id="pickers" class="pickers" style="display:none">
+            <div class="picker">
+                <label for="pick-a">Left law</label>
+                <select id="pick-a"></select>
+            </div>
+            <button id="swap" class="swap" title="Swap sides">&#8646;</button>
+            <div class="picker">
+                <label for="pick-b">Right law</label>
+                <select id="pick-b"></select>
+            </div>
+        </div>
+
+        <div id="toolbar" class="toolbar" style="display:none">
+            <input id="filter" type="text" placeholder="Filter by section name&hellip;">
+            <button id="expand-all">Expand all</button>
+            <button id="collapse-all">Collapse all</button>
+            <label class="check"><input type="checkbox" id="hide-same" checked> Hide identical sections</label>
+            <span id="count" class="count"></span>
+        </div>
+
+        <div id="main">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading laws&hellip;</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'https://white-tiger.play.eco/api/v1';
+
+        // Fuzzy section pairing thresholds. A pair below MIN_SCORE is treated as
+        // two unrelated sections (one removed, one added) rather than a bad diff.
+        const MIN_SCORE   = 0.35;
+        const TITLE_WEIGHT = 0.6;
+
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function stateColor(state) {
+            if (state === 'Active')   return '#3fb950';
+            if (state === 'Proposed') return '#e3b341';
+            if (state === 'Draft')    return '#58a6ff';
+            return '#6e7681';
+        }
+
+        // ── Sections ────────────────────────────────────────────────────────
+        // preprocessEcoLines marks Eco <style="Header"> lines with \x01 sentinels.
+        // Everything up to the first header is the law's preamble.
+
+        function splitSections(raw) {
+            const lines = LawDiff.preprocessEcoLines(raw);
+            const secs = [];
+            let cur = {title: null, lines: []};
+            for (const line of lines) {
+                const m = /^\x01([\s\S]*)\x01$/.exec(line.trim());
+                if (m) {
+                    if (cur.title !== null || cur.lines.some(l => l.trim())) secs.push(cur);
+                    cur = {title: m[1], lines: []};
+                } else {
+                    cur.lines.push(line);
+                }
+            }
+            if (cur.title !== null || cur.lines.some(l => l.trim())) secs.push(cur);
+            // Eco shows sections by position, so carry the 1-based index along —
+            // it is the only handle on a section whose title was renamed.
+            secs.forEach((sec, i) => { sec.n = i + 1; });
+            return secs;
+        }
+
+        function sectionLabel(sec) {
+            return sec.title === null ? '(preamble)' : sec.title;
+        }
+
+        // ── Similarity ──────────────────────────────────────────────────────
+
+        function bigrams(s) {
+            const t = String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+            const out = new Set();
+            for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i + 2));
+            return out;
+        }
+
+        function dice(a, b) {
+            if (!a.size && !b.size) return 1;
+            if (!a.size || !b.size) return 0;
+            let shared = 0;
+            for (const x of a) if (b.has(x)) shared++;
+            return (2 * shared) / (a.size + b.size);
+        }
+
+        // Content similarity on whole lines — laws repeat structure heavily, so
+        // shared exact lines are a much stronger signal than shared words.
+        function lineSim(a, b) {
+            const sa = new Set(a.filter(l => l.trim()));
+            const sb = new Set(b.filter(l => l.trim()));
+            return dice(sa, sb);
+        }
+
+        function pairScore(a, b) {
+            const title = dice(bigrams(sectionLabel(a)), bigrams(sectionLabel(b)));
+            const body  = lineSim(a.lines, b.lines);
+            return TITLE_WEIGHT * title + (1 - TITLE_WEIGHT) * body;
+        }
+
+        // Pair up sections: exact (normalized) titles first, then greedily take
+        // the best remaining scoring pair until nothing clears MIN_SCORE.
+        function matchSections(left, right) {
+            const takenL = new Set(), takenR = new Set();
+            const matches = new Map(); // left index -> {r, exact}
+
+            const norm = s => sectionLabel(s).trim().toLowerCase();
+            const byTitle = new Map();
+            right.forEach((s, j) => {
+                const k = norm(s);
+                if (!byTitle.has(k)) byTitle.set(k, []);
+                byTitle.get(k).push(j);
+            });
+            left.forEach((s, i) => {
+                const q = byTitle.get(norm(s));
+                if (q && q.length) {
+                    const j = q.shift();
+                    matches.set(i, {r: j, exact: true});
+                    takenL.add(i); takenR.add(j);
+                }
+            });
+
+            const cands = [];
+            left.forEach((a, i) => {
+                if (takenL.has(i)) return;
+                right.forEach((b, j) => {
+                    if (takenR.has(j)) return;
+                    const score = pairScore(a, b);
+                    if (score >= MIN_SCORE) cands.push({i, j, score});
+                });
+            });
+            cands.sort((x, y) => y.score - x.score);
+            for (const c of cands) {
+                if (takenL.has(c.i) || takenR.has(c.j)) continue;
+                matches.set(c.i, {r: c.j, exact: false});
+                takenL.add(c.i); takenR.add(c.j);
+            }
+
+            // Walk the left side in order, flushing any right-only sections that
+            // belong before the current match so both laws stay roughly in order.
+            const rows = [];
+            const emittedR = new Set();
+            const flushRightUpTo = limit => {
+                for (let j = 0; j < limit; j++)
+                    if (!takenR.has(j) && !emittedR.has(j)) {
+                        rows.push({left: null, right: right[j], exact: false});
+                        emittedR.add(j);
+                    }
+            };
+            left.forEach((a, i) => {
+                const m = matches.get(i);
+                if (m) {
+                    flushRightUpTo(m.r);
+                    emittedR.add(m.r);
+                    rows.push({left: a, right: right[m.r], exact: m.exact});
+                } else {
+                    rows.push({left: a, right: null, exact: false});
+                }
+            });
+            flushRightUpTo(right.length);
+            return rows;
+        }
+
+        // ── Rendering ───────────────────────────────────────────────────────
+
+        function renderSection(row, idx) {
+            const oldLines = row.left  ? row.left.lines  : [];
+            const newLines = row.right ? row.right.lines : [];
+            const {del, ins} = LawDiff.countChanges(oldLines, newLines);
+            const same = del === 0 && ins === 0;
+
+            let name, chip;
+            if (!row.right) {
+                name = escapeHtml(sectionLabel(row.left));
+                chip = '<span class="chip chip-only-old">only in left</span>';
+            } else if (!row.left) {
+                name = escapeHtml(sectionLabel(row.right));
+                chip = '<span class="chip chip-only-new">only in right</span>';
+            } else if (row.exact || sectionLabel(row.left) === sectionLabel(row.right)) {
+                name = escapeHtml(sectionLabel(row.left));
+                chip = same ? '<span class="chip chip-same">identical</span>' : '';
+            } else {
+                name = `${escapeHtml(sectionLabel(row.left))}`
+                     + `<span class="arrow">&rarr;</span>`
+                     + `<span class="alt">${escapeHtml(sectionLabel(row.right))}</span>`;
+                chip = '<span class="chip chip-fuzzy">fuzzy match</span>';
+            }
+
+            const delta = `<span class="delta">`
+                + `<span class="ins">+${ins}</span><span class="del">−${del}</span></span>`;
+
+            const searchKey = `${row.left ? sectionLabel(row.left) : ''} `
+                            + `${row.right ? sectionLabel(row.right) : ''}`.toLowerCase();
+
+            // Position in each law: a single number when the section did not move,
+            // "old \u2192 new" when it did, with a dash for the side it is missing from.
+            const ln = row.left  ? String(row.left.n)  : '<span class="gone">\u2013</span>';
+            const rn = row.right ? String(row.right.n) : '<span class="gone">\u2013</span>';
+            const moved = !row.left || !row.right || row.left.n !== row.right.n;
+            const num = `<span class="sec-num${moved ? ' moved' : ''}">${
+                moved ? `${ln}<span class="arrow">\u2192</span>${rn}` : ln}</span>`;
+
+            return `
+                <div class="sec-card${same ? ' collapsed' : ''}" data-same="${same ? '1' : '0'}"
+                     data-search="${escapeHtml(searchKey)}">
+                    <div class="sec-header">
+                        <span class="caret">&#9660;</span>
+                        ${num}
+                        <span class="sec-name">${name}</span>
+                        ${chip}
+                        ${delta}
+                    </div>
+                    <div class="sec-body">
+                        <div class="diff-split-wrap"><div class="diff-split">${
+                            LawDiff.renderSplitBlock(oldLines, newLines)}</div></div>
+                    </div>
+                </div>`;
+        }
+
+        function renderHeaderCard(a, b) {
+            const link = l => `<a href="law-view.html?id=${l.Id}">#${l.Id}</a>`;
+            const badge = l => {
+                const c = stateColor(l.State);
+                return `<span class="chip" style="color:${c};border-color:${c}22;background:${c}11">${
+                    escapeHtml(l.State)}</span>`;
+            };
+            const head = `
+                <div class="sp-head">
+                    <div>${escapeHtml(a.Name)} &middot; ${link(a)}</div>
+                    <div>${escapeHtml(b.Name)} &middot; ${link(b)}</div>
+                </div>`;
+
+            let userSection = '';
+            if ((a.UserDescription || '') !== (b.UserDescription || '')) {
+                const oldUD = LawDiff.preprocessEcoLines(a.UserDescription);
+                const newUD = LawDiff.preprocessEcoLines(b.UserDescription);
+                userSection = `
+                    <div class="ud-label">Description</div>
+                    <div class="diff-split-wrap"><div class="diff-split">${
+                        LawDiff.renderSplitBlock(oldUD, newUD)}</div></div>`;
+            }
+
+            return `
+                <div class="sec-card" data-same="0" data-search="">
+                    <div class="sec-header">
+                        <span class="caret">&#9660;</span>
+                        ${badge(a)}
+                        <span class="sec-name">${escapeHtml(a.Name)}
+                            <span class="arrow">&rarr;</span>
+                            <span class="alt">${escapeHtml(b.Name)}</span></span>
+                        ${badge(b)}
+                    </div>
+                    <div class="sec-body">
+                        ${userSection}
+                        ${head}
+                    </div>
+                </div>`;
+        }
+
+        // ── Page wiring ─────────────────────────────────────────────────────
+
+        const STATE_ORDER = ['Draft', 'Proposed', 'Active', 'Removed'];
+
+        function fillSelect(sel, laws, selectedId) {
+            const groups = new Map();
+            for (const l of laws) {
+                const k = l.State || 'Other';
+                if (!groups.has(k)) groups.set(k, []);
+                groups.get(k).push(l);
+            }
+            const keys = [...groups.keys()].sort((a, b) => {
+                const ia = STATE_ORDER.indexOf(a), ib = STATE_ORDER.indexOf(b);
+                return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+            });
+            sel.innerHTML = '<option value="">&mdash; pick a law &mdash;</option>'
+                + keys.map(k => {
+                    const opts = groups.get(k)
+                        .sort((x, y) => x.Name.localeCompare(y.Name))
+                        .map(l => `<option value="${l.Id}"${String(l.Id) === String(selectedId) ? ' selected' : ''}>${
+                            escapeHtml(l.Name)} (#${l.Id})</option>`)
+                        .join('');
+                    return `<optgroup label="${escapeHtml(k)}">${opts}</optgroup>`;
+                }).join('');
+        }
+
+        function applyVisibility() {
+            const hideSame = document.getElementById('hide-same').checked;
+            const q = document.getElementById('filter').value.trim().toLowerCase();
+            let shown = 0;
+            for (const c of document.querySelectorAll('.sec-card')) {
+                const sameHidden = hideSame && c.dataset.same === '1';
+                const filtered   = q && !c.dataset.search.includes(q);
+                c.style.display = sameHidden || filtered ? 'none' : '';
+                if (!sameHidden && !filtered) shown++;
+            }
+            return shown;
+        }
+
+        function render(byId) {
+            const container = document.getElementById('main');
+            const idA = document.getElementById('pick-a').value;
+            const idB = document.getElementById('pick-b').value;
+
+            const url = new URL(location.href);
+            idA ? url.searchParams.set('a', idA) : url.searchParams.delete('a');
+            idB ? url.searchParams.set('b', idB) : url.searchParams.delete('b');
+            history.replaceState(null, '', url);
+
+            const a = byId.get(String(idA)), b = byId.get(String(idB));
+            document.getElementById('toolbar').style.display = a && b ? 'flex' : 'none';
+            if (!a || !b) {
+                container.innerHTML = '<div class="no-data">Pick a law on each side to compare.</div>';
+                return;
+            }
+            if (a.Id === b.Id) {
+                container.innerHTML = '<div class="no-data">Those are the same law.</div>';
+                document.getElementById('toolbar').style.display = 'none';
+                return;
+            }
+
+            const rows = matchSections(splitSections(a.Description), splitSections(b.Description));
+            container.innerHTML = renderHeaderCard(a, b) + rows.map(renderSection).join('');
+
+            const changed = rows.filter((r, i) => {
+                const {del, ins} = LawDiff.countChanges(r.left ? r.left.lines : [],
+                                                        r.right ? r.right.lines : []);
+                return del || ins;
+            }).length;
+            const fuzzy = rows.filter(r => r.left && r.right && !r.exact).length;
+            document.getElementById('count').textContent =
+                `${rows.length} section${rows.length === 1 ? '' : 's'} · ${changed} changed`
+                + (fuzzy ? ` · ${fuzzy} fuzzy-matched` : '');
+            applyVisibility();
+        }
+
+        async function main() {
+            const container = document.getElementById('main');
+            const banner    = document.getElementById('error-banner');
+
+            let laws;
+            try {
+                laws = await fetch(`${API}/laws`)
+                    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+            } catch (err) {
+                banner.textContent = `Could not load laws: ${err.message}`;
+                banner.style.display = 'block';
+                container.innerHTML = '';
+                return;
+            }
+
+            const byId = new Map(laws.map(l => [String(l.Id), l]));
+            const params = new URLSearchParams(location.search);
+            const selA = document.getElementById('pick-a');
+            const selB = document.getElementById('pick-b');
+            fillSelect(selA, laws, params.get('a'));
+            fillSelect(selB, laws, params.get('b'));
+            document.getElementById('pickers').style.display = 'grid';
+
+            selA.addEventListener('change', () => render(byId));
+            selB.addEventListener('change', () => render(byId));
+            document.getElementById('swap').addEventListener('click', () => {
+                const t = selA.value; selA.value = selB.value; selB.value = t;
+                render(byId);
+            });
+
+            container.addEventListener('click', e => {
+                const header = e.target.closest('.sec-header');
+                if (!header || e.target.closest('a')) return;
+                header.parentElement.classList.toggle('collapsed');
+            });
+            document.getElementById('filter').addEventListener('input', applyVisibility);
+            document.getElementById('hide-same').addEventListener('change', applyVisibility);
+            document.getElementById('expand-all').addEventListener('click', () =>
+                document.querySelectorAll('.sec-card').forEach(c => c.classList.remove('collapsed')));
+            document.getElementById('collapse-all').addEventListener('click', () =>
+                document.querySelectorAll('.sec-card').forEach(c => c.classList.add('collapsed')));
+
+            render(byId);
+        }
+
+        main();
+    </script>
+</body>
+</html>

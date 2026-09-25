@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CO₂ by Day - White Tiger</title>
+    <script src="nav.js?v=5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Menlo', 'Monaco', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 6px;
+        }
+
+        header > p {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        .error-banner {
+            background: #0d1117;
+            border: 1px solid #6e3030;
+            border-left: 3px solid #f85149;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #f85149;
+            display: none;
+        }
+
+        .summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat {
+            flex: 1 1 180px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+
+        .stat .label {
+            color: #8b949e;
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+        }
+
+        .stat .value {
+            color: #c9d1d9;
+            font-size: 1.3rem;
+        }
+
+        .chart-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-card h2 {
+            color: #c9d1d9;
+            font-size: 0.95rem;
+            font-weight: normal;
+            margin-bottom: 16px;
+        }
+
+        .chart-card h2 span {
+            color: #6e7681;
+            font-size: 0.8em;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 420px;
+        }
+
+        .no-data {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 420px;
+            color: #6e7681;
+            font-size: 0.875rem;
+        }
+
+        .legend-note {
+            color: #8b949e;
+            font-size: 0.75rem;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CO₂ by Day</h1>
+            <p>Atmospheric CO₂ (vanilla stat <code>TotalCO2</code>) on White Tiger. One line per day, plotted by hour of day. Hourly averages, refreshed every 10 minutes.</p>
+        </header>
+
+        <div id="error-banner" class="error-banner"></div>
+
+        <div class="summary">
+            <div class="stat"><div class="label">Current</div><div class="value" id="stat-now">–</div></div>
+            <div class="stat"><div class="label">Today's peak</div><div class="value" id="stat-peak">–</div></div>
+            <div class="stat"><div class="label">Change since start of day</div><div class="value" id="stat-delta">–</div></div>
+        </div>
+
+        <div class="chart-card">
+            <h2>Total CO₂ <span>(ppm, floor 325)</span></h2>
+            <div id="co2-wrap" class="chart-wrap">
+                <canvas id="co2-chart"></canvas>
+            </div>
+            <p class="legend-note">Older days fade from dim to bright blue; the current day is orange. Click a legend entry to hide a day.</p>
+        </div>
+    </div>
+
+    <script>
+        const BASE      = 'https://white-tiger.play.eco';
+        const STAT      = 'TotalCO2';
+        const FLOOR_PPM = 325;
+        const DAY       = 86400;
+        const REFRESH_MS = 10 * 60 * 1000;
+        const FONT      = { family: 'Consolas, Menlo, Monaco, monospace', size: 11 };
+
+        // Past days never change, so only the current day is refetched on refresh.
+        const dayCache = new Map();
+        let chart = null;
+
+        async function fetchJson(url) {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return await r.json();
+        }
+
+        // The endpoint caps a query at 100 samples and never goes finer than hourly,
+        // so one request per day is the highest resolution available.
+        async function fetchDay(day) {
+            const data = await fetchJson(`${BASE}/datasets/get?dataSet=${STAT}&dayStart=${day}&dayEnd=${day + 1}`);
+            const start = day * DAY, end = start + DAY;
+            const pts = [];
+            (data.Times || []).forEach((t, i) => {
+                // The server over-queries an hour either side; keep the day plus its closing sample.
+                if (t < start || t > end) return;
+                pts.push({ x: (t - start) / 3600, y: data.Values[i] });
+            });
+            return pts;
+        }
+
+        async function mapLimit(items, limit, fn) {
+            const out = new Array(items.length);
+            let next = 0;
+            await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+                while (next < items.length) { const i = next++; out[i] = await fn(items[i]); }
+            }));
+            return out;
+        }
+
+        function dayColor(i, n) {
+            // #1f4f8a -> #79c0ff across past days
+            const a = [31, 79, 138], b = [121, 192, 255];
+            const f = n > 1 ? i / (n - 1) : 1;
+            return `rgb(${a.map((v, j) => Math.round(v + (b[j] - v) * f)).join(',')})`;
+        }
+
+        function fmtHour(h) {
+            const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+            return `${hh}:${String(mm).padStart(2, '0')}`;
+        }
+
+        function render(days) {
+            const wrap = document.getElementById('co2-wrap');
+            const withData = days.filter(d => d.pts.length);
+            if (!withData.length) { wrap.innerHTML = '<div class="no-data">No data available</div>'; return; }
+
+            const last = withData[withData.length - 1];
+            const datasets = withData.map((d, i) => {
+                const isLast = d === last;
+                const color = isLast ? '#f0883e' : dayColor(i, withData.length - 1);
+                return {
+                    label: `Day ${d.day + 1}`,
+                    data: d.pts,
+                    borderColor: color,
+                    backgroundColor: color,
+                    borderWidth: isLast ? 2.5 : 1.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    cubicInterpolationMode: 'monotone',  // plain tension overshoots below the floor
+                    order: isLast ? 0 : 1,
+                };
+            });
+
+            const ymax = Math.max(FLOOR_PPM + 10, Math.ceil(Math.max(...withData.flatMap(d => d.pts.map(p => p.y))) / 5) * 5 + 5);
+
+            if (chart) {
+                chart.data.datasets = datasets;
+                chart.options.scales.y.max = ymax;
+                chart.update('none');
+            } else {
+                chart = new Chart(document.getElementById('co2-chart'), {
+                    type: 'line',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        interaction: { mode: 'nearest', intersect: false },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#c9d1d9', font: FONT, boxWidth: 12, boxHeight: 2,
+                                    // Dataset `order` would otherwise pull the current day to the front.
+                                    sort: (a, b) => a.datasetIndex - b.datasetIndex,
+                                },
+                            },
+                            tooltip: {
+                                backgroundColor: '#161b22',
+                                borderColor: '#30363d',
+                                borderWidth: 1,
+                                titleColor: '#c9d1d9',
+                                bodyColor: '#8b949e',
+                                callbacks: {
+                                    title: items => items.length ? `${items[0].dataset.label} · ${fmtHour(items[0].parsed.x)}` : '',
+                                    label: ctx => ` ${ctx.parsed.y.toFixed(2)} ppm`,
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                min: 0,
+                                max: 24,
+                                ticks: { color: '#8b949e', font: FONT, stepSize: 3, callback: v => `${v}:00` },
+                                grid: { color: '#21262d' },
+                                border: { color: '#30363d' },
+                                title: { display: true, text: 'Hour of day', color: '#6e7681', font: FONT },
+                            },
+                            y: {
+                                min: FLOOR_PPM,
+                                max: ymax,
+                                ticks: { color: '#8b949e', font: FONT },
+                                grid: { color: '#21262d' },
+                                border: { color: '#30363d' },
+                                title: { display: true, text: 'CO₂ (ppm)', color: '#6e7681', font: FONT },
+                            },
+                        },
+                    },
+                });
+            }
+
+            const vals = last.pts.map(p => p.y);
+            const now = vals[vals.length - 1], delta = now - vals[0];
+            document.getElementById('stat-now').textContent   = `${now.toFixed(1)} ppm`;
+            document.getElementById('stat-peak').textContent  = `${Math.max(...vals).toFixed(1)} ppm`;
+            document.getElementById('stat-delta').textContent = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} ppm`;
+        }
+
+        async function load() {
+            const banner = document.getElementById('error-banner');
+            try {
+                const [, endDay] = await fetchJson(`${BASE}/datasets/timerange`);
+                const today = Math.floor(endDay);
+                const days = [];
+                for (let d = 0; d <= today; d++) days.push(d);
+
+                // The day before today is refetched too, so its closing sample appears once today starts.
+                const failed = [];
+                await mapLimit(days.filter(d => !dayCache.has(d) || d >= today - 1), 6, async d => {
+                    try { dayCache.set(d, await fetchDay(d)); }
+                    catch { failed.push(d + 1); }
+                });
+
+                render(days.map(d => ({ day: d, pts: dayCache.get(d) || [] })));
+
+                banner.style.display = failed.length ? 'block' : 'none';
+                if (failed.length) banner.textContent = `Could not load days: ${failed.sort((a, b) => a - b).join(', ')}`;
+            } catch (e) {
+                banner.textContent = `Could not load CO₂ data: ${e.message}`;
+                banner.style.display = 'block';
+            }
+        }
+
+        load();
+        setInterval(load, REFRESH_MS);
+    </script>
+</body>
+</html>

@@ -14,6 +14,7 @@
     <a class="wt-nav-link" href="crafting-tables.html" data-page="crafting-tables.html">Crafting Tables</a>
     <div class="wt-nav-section">Server</div>
     <a class="wt-nav-link" href="server-stats.html" data-page="server-stats.html">Server Stats</a>
+    <a class="wt-nav-link" href="co2.html" data-page="co2.html">CO₂ by Day</a>
     <a class="wt-nav-link wt-nav-external" href="https://weylint.github.io/ecoflow" target="_blank" rel="noopener">EcoFlow <span class="wt-nav-ext-icon">↗</span></a>
     <div class="wt-nav-section">Help</div>
     <a class="wt-nav-link" href="help/howtogov.html" data-page="help/howtogov.html">How-To Gov</a>

@@ -19,6 +19,7 @@ No build system. Plain HTML files with inline `<script>` tags, served via GitHub
 | `law-diff.js` | Shared Eco law diff module — `LawDiff.preprocessEcoLines()` / `.renderSplitBlock()` / `.countChanges()` / `.isIdentical()` — used by `election-diff.html` and `draft-diff.html` |
 | `law-diff.css` | Styles for the markup `law-diff.js` emits (`.sp-*` split view, `.eco-*` markup). Link it wherever `law-diff.js` is used |
 | `custom-stats.html` | Overview of custom stats written/read across all laws |
+| `co2.html` | Live `TotalCO2` per day by hour of day, from the server's `/datasets/get` endpoint (one request per day; hourly is the finest the endpoint returns) |
 | `nav.js` | Shared left-nav sidebar injected on every page |
 | `white-tiger-api.js` | Shared API module — `WhiteTigerAPI.fetchRecipes()` / `.fetchStores()` / `.fetchAllItems()` |
 | `eco-render.js` | Shared rendering helpers (store name HTML, color tags) |

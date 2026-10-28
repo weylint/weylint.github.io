@@ -1,12 +1,11 @@
 # API: `/laws`
 
-Base URL: `https://white-tiger.play.eco/api/v1/laws`
+Base URL: `https://gs1-wt.play.eco/api/v1/laws`
 
 No shared JS module — called directly via `fetch`.
 
-`white-tiger.play.eco` sits behind Cloudflare, so command-line tools get a `403` challenge page.
-The same API is reachable unproxied over plain HTTP at `http://gs1.play.eco:3041/api/v1/...` —
-use that when inspecting data from a shell. Pages keep using the HTTPS host (browsers pass the challenge).
+`gs1-wt.play.eco` sits behind Cloudflare, so command-line tools get a `403` challenge page;
+the raw `http://gs1.play.eco:3041` endpoint no longer responds. Inspect data from a browser.
 
 ---
 
@@ -14,7 +13,7 @@ use that when inspecting data from a shell. Pages keep using the HTTPS host (bro
 
 Returns all laws on the server (including removed ones).
 
-**URL:** `https://white-tiger.play.eco/api/v1/laws`
+**URL:** `https://gs1-wt.play.eco/api/v1/laws`
 
 ### Response shape
 
@@ -54,7 +53,7 @@ Returns all laws on the server (including removed ones).
 
 Returns a single law by its numeric ID.
 
-**URL:** `https://white-tiger.play.eco/api/v1/laws/121644`
+**URL:** `https://gs1-wt.play.eco/api/v1/laws/121644`
 
 ### Response shape
 

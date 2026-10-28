@@ -1,7 +1,7 @@
 # API: `/allItems`
 
 **Method:** `GET`
-**URL:** `https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/allItems`
+**URL:** `https://gs1-wt.play.eco/api/v1/plugins/EcoPriceCalculator/allItems`
 **JS helper:** `WhiteTigerAPI.fetchAllItems()`
 
 ## Response shape

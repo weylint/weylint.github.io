@@ -190,15 +190,12 @@
 
     <script>
         const SERVERS = [
-            { slug: 'white-tiger',    name: 'White Tiger',    color: '#c9d1d9' },
-            { slug: 'sea-otter',      name: 'Sea Otter',      color: '#58a6ff' },
-            { slug: 'coast-redwood',  name: 'Coast Redwood',  color: '#3fb950' },
-            { slug: 'dusky-robin',    name: 'Dusky Robin',    color: '#e3b341' },
-            { slug: 'giant-panda',    name: 'Giant Panda',    color: '#bc8cff' },
-            // Lumber Ridge: waiting on DNS/TLS for lumber-ridge.play.eco. Until then the raw
-            // endpoint below is used, but only when this page is opened locally over http:// or
-            // file:// — an https:// page cannot fetch it (mixed content).
-            { slug: 'lumber-ridge',   name: 'Lumber Ridge',   color: '#f0883e', fallbackBase: 'http://gs1.play.eco:3051' },
+            { code: 'wt',    name: 'White Tiger',    color: '#c9d1d9' },
+            { code: 'so',      name: 'Sea Otter',      color: '#58a6ff' },
+            { code: 'cr',  name: 'Coast Redwood',  color: '#3fb950' },
+            { code: 'dr',    name: 'Dusky Robin',    color: '#e3b341' },
+            { code: 'gp',    name: 'Giant Panda',    color: '#bc8cff' },
+            { code: 'lr',    name: 'Lumber Ridge',   color: '#f0883e' },
         ];
 
         const DATASETS = {
@@ -211,7 +208,7 @@
         };
 
         function serverBase(server) {
-            return server.base || `https://${server.slug}.play.eco`;
+            return server.base || `https://gs1-${server.code}.play.eco`;
         }
 
         // An https:// page may only fetch https:// URLs, so plain-HTTP fallbacks are usable
@@ -222,7 +219,8 @@
         const usedFallback = new Set();
 
         async function fetchJson(url) {
-            const r = await fetch(url);
+            // A dead host would otherwise hold up Promise.all in main() until the browser gives up.
+            const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return await r.json();
         }

@@ -336,7 +336,7 @@
             }
 
             try {
-                const res = await fetch(`https://white-tiger.play.eco/api/v1/laws/${id}`);
+                const res = await fetch(`https://gs1-wt.play.eco/api/v1/laws/${id}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const law = await res.json();
 

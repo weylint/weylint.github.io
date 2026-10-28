@@ -1,7 +1,7 @@
 # API: `/recipes`
 
 **Method:** `GET`
-**URL:** `https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/recipes`
+**URL:** `https://gs1-wt.play.eco/api/v1/plugins/EcoPriceCalculator/recipes`
 **JS helper:** `WhiteTigerAPI.fetchRecipes()`
 
 ## Response shape

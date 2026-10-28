@@ -1,7 +1,7 @@
 # API: `/stores`
 
 **Method:** `GET`
-**URL:** `https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/stores`
+**URL:** `https://gs1-wt.play.eco/api/v1/plugins/EcoPriceCalculator/stores`
 **JS helper:** `WhiteTigerAPI.fetchStores()`
 
 ## Response shape

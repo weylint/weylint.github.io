@@ -35,7 +35,7 @@ No build system. Plain HTML files with inline `<script>` tags, served via GitHub
 
 ### EcoPriceCalculator (economy pages)
 
-Base URL: `https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator`
+Base URL: `https://gs1-wt.play.eco/api/v1/plugins/EcoPriceCalculator`
 
 Include before the page's inline `<script>`:
 ```html
@@ -45,7 +45,7 @@ Include before the page's inline `<script>`:
 
 ### Laws (law pages)
 
-Base URL: `https://white-tiger.play.eco/api/v1/laws`
+Base URL: `https://gs1-wt.play.eco/api/v1/laws`
 
 Used directly (no shared module). See `docs/api-laws.md`.
 

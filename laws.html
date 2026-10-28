@@ -419,7 +419,7 @@
             const banner = document.getElementById('error-banner');
 
             try {
-                const res = await fetch('https://white-tiger.play.eco/api/v1/laws');
+                const res = await fetch('https://gs1-wt.play.eco/api/v1/laws');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const laws = await res.json();
 

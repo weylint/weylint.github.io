@@ -1,7 +1,7 @@
 # API: `/craftingTables`
 
 **Method:** `GET`
-**URL:** `https://white-tiger.play.eco/api/v1/plugins/EcoPriceCalculator/craftingTables`
+**URL:** `https://gs1-wt.play.eco/api/v1/plugins/EcoPriceCalculator/craftingTables`
 **JS helper:** `WhiteTigerAPI.fetchCraftingTables()`
 
 ## Response shape
